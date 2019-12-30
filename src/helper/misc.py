@@ -29,3 +29,11 @@ def inference(set_x, varMatrices, architecture):
       label = -1
     output.append(label)
   return output
+
+def calc_accuracy(inferred, y):
+  acc = 0
+  for i, label in enumerate(inferred):
+    if label == y[i]:
+      acc += 1
+  acc = acc/len(y)
+  return acc*100

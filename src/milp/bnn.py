@@ -1,3 +1,8 @@
+"""
+This work heavily relies on the implementation by Icarte:
+https://bitbucket.org/RToroIcarte/bnn/src/master/
+"""
+
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
@@ -15,8 +20,7 @@ def mycallback(model, where):
       model._lastobjbnd = objbnd
       model._periodic.append((nodecnt, objbst, objbnd, runtime, gap))
 
-N = 3
-class IcarteBNN:
+class BNN:
   def __init__(self, N, architecture):
 
     self.N = N
@@ -129,6 +133,7 @@ class IcarteBNN:
     self.m._periodic = []
     self.m.optimize(mycallback)
 
+
   def extract_values(self):
     def getVal(maybeVar):
       try:
@@ -143,17 +148,32 @@ class IcarteBNN:
     for layer in self.weights:
       varMatrices["w_%s" %layer] = getVal(self.weights[layer])
       varMatrices["b_%s" %layer] = getVal(self.biases[layer])
-      print("Weight %s" % layer)
-      print(varMatrices["w_%s" %layer])
-      print("Biases %s" % layer)
-      print(varMatrices["b_%s" %layer])
       if layer > 1:
         varMatrices["c_%s" %layer] = getVal(self.var_c[layer])
-        print("C %s" % layer)
-        print(varMatrices["c_%s" %layer])
       if layer < len(self.architecture) - 1:
         varMatrices["act_%s" %layer] = getVal(self.act[layer])
-        print("Activations %s" % layer)
-        print(varMatrices["act_%s" %layer])
 
     return varMatrices
+
+
+  def print_values(self):
+    def getVal(maybeVar):
+      try:
+        val = maybeVar.x
+      except:
+        val = 0
+      return val
+
+    getVal = np.vectorize(getVal)
+
+    for layer in self.weights:
+      print("Weight %s" % layer)
+      print(getVal(self.weights[layer]))
+      print("Biases %s" % layer)
+      print(getVal(self.biases[layer]))
+      if layer > 1:
+        print("C %s" % layer)
+        print(getVal(self.var_c[layer]))
+      if layer < len(self.architecture) - 1:
+        print("Activations %s" % layer)
+        print(getVal(self.act[layer]))
