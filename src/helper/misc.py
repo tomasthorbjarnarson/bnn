@@ -1,0 +1,31 @@
+import numpy as np
+
+def numpy_sign(varMatrix):
+  signVarMatrix = varMatrix
+  signVarMatrix[varMatrix >= 0] = 1
+  signVarMatrix[varMatrix < 0] = -1
+  return signVarMatrix
+
+def inference(set_x, varMatrices, architecture):
+  N_test, input_size = np.shape(set_x)
+  
+  output = []
+  
+  infer = set_x
+
+  for lastLayer, neurons_out in enumerate(architecture[1:]):
+    layer = lastLayer + 1
+
+    infer = np.dot(np.transpose(varMatrices["w_%s" % layer]),infer)
+    infer += np.reshape(varMatrices["b_%s" % layer], (neurons_out,1))
+    if layer < len(architecture) - 1:
+      infer = numpy_sign(infer)
+
+  for row in np.transpose(infer):
+    label = np.argwhere(row >= 0)
+    if len(label) == 1 and len(label[0]) == 1:
+      label = label[0][0]
+    else:
+      label = -1
+    output.append(label)
+  return output

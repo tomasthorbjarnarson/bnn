@@ -1,0 +1,6 @@
+*.pdf
+Gurobi/
+*.log
+*.txt
+src/results/
+*.gz
