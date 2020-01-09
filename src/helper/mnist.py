@@ -5,7 +5,10 @@ import numpy as np
 import math
 
 def preprocess_mnist(set_x):
-  proc_x = set_x/255
+  # Keep this for later
+  #proc_x = set_x/255
+  # Use this to simply set to float
+  proc_x = set_x / 1.0
   proc_x = np.transpose(proc_x)
   return proc_x
 
@@ -31,8 +34,8 @@ def load_mnist(N):
   max_num = len(og_train_y)
 
   og_train_x = preprocess_mnist(og_train_x)
-
-  og_oh_train_y = one_hot(og_train_y, num_labels=10)
+  # Map labels to 1 and -1 instead of 1 and 0
+  og_oh_train_y = 2*one_hot(og_train_y, num_labels=10)-1
   og_oh_train_y = np.transpose(og_oh_train_y)
 
   train_indices = get_unique_examples(og_train_x, og_train_y, N)
@@ -47,7 +50,7 @@ def load_mnist(N):
   oh_val_y = og_oh_train_y[:,val_indices]
 
   test_x = preprocess_mnist(test_x)
-  oh_test_y = one_hot(test_y, num_labels=10)
+  oh_test_y = 2*one_hot(test_y, num_labels=10)-1
   oh_test_y = np.transpose(oh_test_y)
 
   return train_x, train_y, oh_train_y, val_x, val_y, oh_val_y, test_x, test_y, oh_test_y

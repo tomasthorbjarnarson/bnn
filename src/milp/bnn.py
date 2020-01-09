@@ -21,7 +21,6 @@ def mycallback(model, where):
       model._lastobjbnd = objbnd
       model._periodic.append((nodecnt, objbst, objbnd, runtime, gap, model._val_acc))
   elif where == GRB.Callback.MIPSOL:
-    print("New solution!")
     nodecnt = model.cbGet(GRB.Callback.MIPSOL_NODCNT)
     objbst = model.cbGet(GRB.Callback.MIPSOL_OBJBST)
     objbnd = model.cbGet(GRB.Callback.MIPSOL_OBJBND)
@@ -168,6 +167,7 @@ class BNN:
     self.m._val_y = self.val_y
     self.m._architecture = self.architecture
     self.m._val_acc = 0
+    self.m.update()
     self.m.optimize(mycallback)
 
     # Add last value after optimisation finishes
