@@ -19,12 +19,15 @@ class DataSaver:
     self.architecture = architecture
     self.num_examples = num_examples
     self.focus = focus
-    self.time_elapsed = time if bnn.m.MIPGap > 0 else math.floor(bnn.m._periodic[-1][3])
-    self.title = '#Exs:%s-Time:%s-Focus:%s' % (num_examples,self.time_elapsed,focus)
+    self.time_elapsed = math.floor(bnn.m.Runtime)
+
+    now = datetime.now()
+    nowStr = now.strftime("%d %b %H:%M")
+    self.title = '#Exs:%s-Time:%s-Focus:%s_%s' % (num_examples,self.time_elapsed,focus,nowStr)
     self.plot_dir, self.json_dir = get_file_locations(architecture)
 
   def plot_periodic(self):
-    per_filtered = [z for z in self.bnn.m._periodic if z[4] < 0.8]
+    per_filtered = [z for z in self.bnn.m._periodic if z[4] < 0.95]
     x = [z[3] for z in per_filtered]
     y = [z[1] for z in per_filtered]
     y2 = [z[2] for z in per_filtered]
@@ -35,6 +38,12 @@ class DataSaver:
     plt.xlabel("Time [s]")
     plt.ylabel("Sum of absolute weights")
     plt.title(self.title)
+    last_acc = 0
+    for sol in per_filtered:
+      if sol[5] != last_acc:
+        plt.annotate("%.2f" % sol[5],(sol[3], sol[1]))
+        last_acc = sol[5]
+    plt.show()
     plt.savefig("%s/%s.png" % (self.plot_dir, self.title), bbox_inches='tight')
 
 
@@ -54,7 +63,13 @@ class DataSaver:
       'MIPFocus': self.focus,
       'trainingAcc': train_acc,
       'testingAcc': test_acc,
-      'variables': self.bnn.extract_values()
+      'num_vars': self.bnn.m.NumVars,
+      'num_int_vars': self.bnn.m.NumIntVars,
+      'num_binary_vars': self.bnn.m.NumBinVars,
+      'num_constrs': self.bnn.m.NumConstrs,
+      'num_nonzeros': self.bnn.m.NumNZs,
+      'periodic': self.bnn.m._periodic,
+      'variables': self.bnn.extract_values(),
     }
 
     with open('%s/%s.json' % (self.json_dir, self.title), 'w') as f:

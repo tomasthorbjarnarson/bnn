@@ -7,6 +7,7 @@ import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 from helper.mnist import load_mnist
+from helper.misc import inference, calc_accuracy
 
 def mycallback(model, where):
   if where == GRB.Callback.MIP:
@@ -18,14 +19,44 @@ def mycallback(model, where):
     if objbst < model._lastobjbst or objbnd > model._lastobjbnd:
       model._lastobjbst = objbst
       model._lastobjbnd = objbnd
-      model._periodic.append((nodecnt, objbst, objbnd, runtime, gap))
+      model._periodic.append((nodecnt, objbst, objbnd, runtime, gap, model._val_acc))
+  elif where == GRB.Callback.MIPSOL:
+    print("New solution!")
+    nodecnt = model.cbGet(GRB.Callback.MIPSOL_NODCNT)
+    objbst = model.cbGet(GRB.Callback.MIPSOL_OBJBST)
+    objbnd = model.cbGet(GRB.Callback.MIPSOL_OBJBND)
+    runtime = model.cbGet(GRB.Callback.RUNTIME)
+    gap = 1 - objbnd/objbst
+    model._lastobjbst = objbst
+    model._lastobjbnd = objbnd
+
+    varMatrices = {}
+    for layer in model._weights:
+      w_shape = model._weights[layer].shape
+      b_shape = model._biases[layer].shape
+      varMatrices["w_%s" % layer] = np.zeros(w_shape)
+      varMatrices["b_%s" % layer] = np.zeros(b_shape)
+      for i in range(w_shape[0]):
+        for j in range(w_shape[1]):
+          if type(model._weights[layer][i,j]) != int:
+            varMatrices["w_%s" % layer][i,j] = model.cbGetSolution(model._weights[layer][i,j])
+      for i in range(b_shape[0]):
+        varMatrices["b_%s" % layer][i] = model.cbGetSolution(model._biases[layer][i])
+
+    infer_test = inference(model._val_x, varMatrices, model._architecture)
+    val_acc = calc_accuracy(infer_test, model._val_y)
+    print("Validation accuracy: %s " % (val_acc))
+
+    model._periodic.append((nodecnt, objbst, objbnd, runtime, gap, val_acc))
+    model._val_acc = val_acc
+
 
 class BNN:
   def __init__(self, N, architecture):
 
     self.N = N
     self.architecture = architecture
-    self.train_x, self.train_y, self.oh_train_y, self.test_x, self.test_y, self.oh_test_y = load_mnist(N)
+    self.train_x, self.train_y, self.oh_train_y, self.val_x, self.val_y, self.oh_val_y, self.test_x, self.test_y, self.oh_test_y = load_mnist(N)
     dead = np.all(self.train_x == 0, axis=1)
 
     self.weights = {}
@@ -131,8 +162,18 @@ class BNN:
     self.m._lastobjbst = GRB.INFINITY
     self.m._lastobjbnd = -GRB.INFINITY
     self.m._periodic = []
+    self.m._weights = self.weights
+    self.m._biases = self.biases
+    self.m._val_x = self.val_x
+    self.m._val_y = self.val_y
+    self.m._architecture = self.architecture
+    self.m._val_acc = 0
     self.m.optimize(mycallback)
 
+    # Add last value after optimisation finishes
+    gap = 1 - self.m.ObjBound/self.m.ObjVal
+    if gap != self.m._periodic[-1][4]:
+      self.m._periodic.append((self.m.NodeCount, self.m.ObjVal, self.m.ObjBound, self.m.Runtime, gap))
 
   def extract_values(self):
     def getVal(maybeVar):

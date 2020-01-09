@@ -6,8 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from pdb import set_trace
-
 use_gpu = torch.cuda.is_available()
 print("use_gpu", use_gpu)
 
