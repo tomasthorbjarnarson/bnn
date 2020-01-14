@@ -4,54 +4,11 @@ https://bitbucket.org/RToroIcarte/bnn/src/master/
 """
 
 import numpy as np
-import gurobipy as gp
-from gurobipy import GRB
 from helper.mnist import load_mnist
-from helper.misc import inference, calc_accuracy
-
-def mycallback(model, where):
-  if where == GRB.Callback.MIP:
-    nodecnt = model.cbGet(GRB.Callback.MIP_NODCNT)
-    objbst = model.cbGet(GRB.Callback.MIP_OBJBST)
-    objbnd = model.cbGet(GRB.Callback.MIP_OBJBND)
-    runtime = model.cbGet(GRB.Callback.RUNTIME)
-    gap = 1 - objbnd/objbst
-    if objbst < model._lastobjbst or objbnd > model._lastobjbnd:
-      model._lastobjbst = objbst
-      model._lastobjbnd = objbnd
-      model._periodic.append((nodecnt, objbst, objbnd, runtime, gap, model._val_acc))
-  elif where == GRB.Callback.MIPSOL:
-    nodecnt = model.cbGet(GRB.Callback.MIPSOL_NODCNT)
-    objbst = model.cbGet(GRB.Callback.MIPSOL_OBJBST)
-    objbnd = model.cbGet(GRB.Callback.MIPSOL_OBJBND)
-    runtime = model.cbGet(GRB.Callback.RUNTIME)
-    gap = 1 - objbnd/objbst
-    model._lastobjbst = objbst
-    model._lastobjbnd = objbnd
-
-    varMatrices = {}
-    for layer in model._weights:
-      w_shape = model._weights[layer].shape
-      b_shape = model._biases[layer].shape
-      varMatrices["w_%s" % layer] = np.zeros(w_shape)
-      varMatrices["b_%s" % layer] = np.zeros(b_shape)
-      for i in range(w_shape[0]):
-        for j in range(w_shape[1]):
-          if type(model._weights[layer][i,j]) != int:
-            varMatrices["w_%s" % layer][i,j] = model.cbGetSolution(model._weights[layer][i,j])
-      for i in range(b_shape[0]):
-        varMatrices["b_%s" % layer][i] = model.cbGetSolution(model._biases[layer][i])
-
-    infer_test = inference(model._val_x, varMatrices, model._architecture)
-    val_acc = calc_accuracy(infer_test, model._val_y)
-    print("Validation accuracy: %s " % (val_acc))
-
-    model._periodic.append((nodecnt, objbst, objbnd, runtime, gap, val_acc))
-    model._val_acc = val_acc
-
+from globals import INT, BIN, CONT
 
 class BNN:
-  def __init__(self, N, architecture):
+  def __init__(self, model, N, architecture):
 
     self.N = N
     self.architecture = architecture
@@ -66,17 +23,11 @@ class BNN:
     self.abs_weights = {}
     self.abs_biases = {}
 
-    p_precision = GRB.INTEGER
     p_bound = 1
-
-    pre_precision = GRB.CONTINUOUS
     pre_bound = 1
-
-    act_precision = GRB.BINARY
-
     epsilon = 1
 
-    self.m = gp.Model("mip1")
+    self.m = model
 
     self.periodic = []
 
@@ -101,23 +52,23 @@ class BNN:
             self.weights[layer][i,j] = 0
             self.abs_weights[layer][i,j] = 0
           else:
-            self.weights[layer][i,j] = self.m.addVar(vtype=p_precision, lb=-p_bound, ub=p_bound, name="w_%s-%s_%s" % (layer,i,j))
-            self.abs_weights[layer][i,j] = self.m.addVar(vtype=GRB.BINARY, name="abs(w)_%s-%s_%s" % (layer,i,j))
-            self.m.addConstr(self.abs_weights[layer][i,j] >= self.weights[layer][i,j])
-            self.m.addConstr(-self.abs_weights[layer][i,j] <= self.weights[layer][i,j])
+            self.weights[layer][i,j] = self.add_var(INT,"w_%s-%s_%s" % (layer,i,j), p_bound)
+            self.abs_weights[layer][i,j] = self.add_var(BIN,"abs(w)_%s-%s_%s" % (layer,i,j))
+            self.add_constraint(self.abs_weights[layer][i,j] >= self.weights[layer][i,j])
+            self.add_constraint(-self.abs_weights[layer][i,j] <= self.weights[layer][i,j])
           if layer > 1:
             # Var c only needed after first activation
             for k in range(N):
-              self.var_c[layer][k,i,j] = self.m.addVar(vtype=pre_precision, lb=-pre_bound, ub=pre_bound, name="c_%s-%s_%s_%s" % (layer,i,j,k))
+              self.var_c[layer][k,i,j] = self.add_var(CONT,"c_%s-%s_%s_%s" % (layer,i,j,k), pre_bound)
         # Bias only for each output neuron
-        self.biases[layer][j] = self.m.addVar(vtype=p_precision, lb=-p_bound, ub=p_bound, name="b_%s-%s" % (layer,j))
-        self.abs_biases[layer][j] = self.m.addVar(vtype=GRB.BINARY, name="abs(b)_%s-%s" % (layer,j))
-        self.m.addConstr(self.abs_biases[layer][j] >= self.biases[layer][j])
-        self.m.addConstr(-self.abs_biases[layer][j] <= self.biases[layer][j])
+        self.biases[layer][j] = self.add_var(INT,"b_%s-%s" % (layer,j), p_bound)
+        self.abs_biases[layer][j] = self.add_var(BIN,"abs(b)_%s-%s" % (layer,j))
+        self.add_constraint(self.abs_biases[layer][j] >= self.biases[layer][j])
+        self.add_constraint(-self.abs_biases[layer][j] <= self.biases[layer][j])
 
         if layer < len(architecture) - 1:
           for k in range(N):
-            self.act[layer][k,j] = self.m.addVar(vtype=act_precision, name="act_%s-%s_%s" % (layer,j,k))
+            self.act[layer][k,j] = self.add_var(BIN, name="act_%s-%s_%s" % (layer,j,k))
 
 
     for lastLayer, neurons_out in enumerate(architecture[1:]):
@@ -131,21 +82,21 @@ class BNN:
             if layer == 1:
               inputs.append(self.train_x[i,k]*self.weights[layer][i,j])
             else:
-              self.m.addConstr(self.var_c[layer][k,i,j] - self.weights[layer][i,j] + 2*self.act[lastLayer][k,i] <= 2)
-              self.m.addConstr(self.var_c[layer][k,i,j] + self.weights[layer][i,j] - 2*self.act[lastLayer][k,i] <= 0)
-              self.m.addConstr(self.var_c[layer][k,i,j] - self.weights[layer][i,j] - 2*self.act[lastLayer][k,i] >= -2)
-              self.m.addConstr(self.var_c[layer][k,i,j] + self.weights[layer][i,j] + 2*self.act[lastLayer][k,i] >= 0)
+              self.add_constraint(self.var_c[layer][k,i,j] - self.weights[layer][i,j] + 2*self.act[lastLayer][k,i] <= 2)
+              self.add_constraint(self.var_c[layer][k,i,j] + self.weights[layer][i,j] - 2*self.act[lastLayer][k,i] <= 0)
+              self.add_constraint(self.var_c[layer][k,i,j] - self.weights[layer][i,j] - 2*self.act[lastLayer][k,i] >= -2)
+              self.add_constraint(self.var_c[layer][k,i,j] + self.weights[layer][i,j] + 2*self.act[lastLayer][k,i] >= 0)
               inputs.append(self.var_c[layer][k,i,j])
           pre_activation = sum(inputs) + self.biases[layer][j]
 
           if layer < len(architecture) - 1:
-            self.m.addConstr((self.act[layer][k,j] == 1) >> (pre_activation >= 0))
-            self.m.addConstr((self.act[layer][k,j] == 0) >> (pre_activation <= -epsilon))
+            self.add_constraint((self.act[layer][k,j] == 1) >> (pre_activation >= 0))
+            self.add_constraint((self.act[layer][k,j] == 0) >> (pre_activation <= -epsilon))
           else:
             if self.oh_train_y[j,k] > 0:
-              self.m.addConstr(pre_activation >= 0)
+              self.add_constraint(pre_activation >= 0)
             else:
-              self.m.addConstr(pre_activation <= -epsilon)
+              self.add_constraint(pre_activation <= -epsilon)
 
     self.objSum = 0
     for layer in self.abs_weights:
@@ -153,68 +104,50 @@ class BNN:
     for layer in self.abs_biases:
       self.objSum += self.abs_biases[layer].sum()
 
+  def add_var(self, precision, name, bound=0):
+    raise NotImplementedError("Add variable not implemented")
 
-  def train(self, time, focus):
-    self.m.setObjective(self.objSum , GRB.MINIMIZE)
-    self.m.setParam('TimeLimit', time)
-    self.m.setParam('MIPFocus', focus)
-    self.m._lastobjbst = GRB.INFINITY
-    self.m._lastobjbnd = -GRB.INFINITY
-    self.m._periodic = []
-    self.m._weights = self.weights
-    self.m._biases = self.biases
-    self.m._val_x = self.val_x
-    self.m._val_y = self.val_y
-    self.m._architecture = self.architecture
-    self.m._val_acc = 0
-    self.m.update()
-    self.m.optimize(mycallback)
+  def add_constraint(self, constraint):
+    raise NotImplementedError("Add constraint not implemented")
+    
+  def train(self, time=None, focus=None):
+    raise NotImplementedError("Train not implemented")
 
-    # Add last value after optimisation finishes
-    gap = 1 - self.m.ObjBound/self.m.ObjVal
-    if gap != self.m._periodic[-1][4]:
-      self.m._periodic.append((self.m.NodeCount, self.m.ObjVal, self.m.ObjBound, self.m.Runtime, gap))
+  def get_objective(self):
+    raise NotImplementedError("Get objective not implemented")
+
+  def get_runtime(self):
+    raise NotImplementedError("Get runtime not implemented")
+    
+  def get_val(self, maybe_var):
+    raise NotImplementedError("Get value not implemented")
 
   def extract_values(self):
-    def getVal(maybeVar):
-      try:
-        val = maybeVar.x
-      except:
-        val = 0
-      return val
-
-    getVal = np.vectorize(getVal)
+    get_val = np.vectorize(self.get_val)
 
     varMatrices = {}
     for layer in self.weights:
-      varMatrices["w_%s" %layer] = getVal(self.weights[layer])
-      varMatrices["b_%s" %layer] = getVal(self.biases[layer])
+      varMatrices["w_%s" %layer] = get_val(self.weights[layer])
+      varMatrices["b_%s" %layer] = get_val(self.biases[layer])
       if layer > 1:
-        varMatrices["c_%s" %layer] = getVal(self.var_c[layer])
+        varMatrices["c_%s" %layer] = get_val(self.var_c[layer])
       if layer < len(self.architecture) - 1:
-        varMatrices["act_%s" %layer] = getVal(self.act[layer])
+        varMatrices["act_%s" %layer] = get_val(self.act[layer])
 
     return varMatrices
 
 
   def print_values(self):
-    def getVal(maybeVar):
-      try:
-        val = maybeVar.x
-      except:
-        val = 0
-      return val
-
-    getVal = np.vectorize(getVal)
+    get_val = np.vectorize(self.get_val)
 
     for layer in self.weights:
       print("Weight %s" % layer)
-      print(getVal(self.weights[layer]))
+      print(get_val(self.weights[layer]))
       print("Biases %s" % layer)
-      print(getVal(self.biases[layer]))
+      print(get_val(self.biases[layer]))
       if layer > 1:
         print("C %s" % layer)
-        print(getVal(self.var_c[layer]))
+        print(get_val(self.var_c[layer]))
       if layer < len(self.architecture) - 1:
         print("Activations %s" % layer)
-        print(getVal(self.act[layer]))
+        print(get_val(self.act[layer]))

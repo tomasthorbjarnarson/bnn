@@ -1,19 +1,18 @@
 from milp.bnn import BNN
+from milp.cplex_bnn import Cplex_BNN
+from milp.gurobi_bnn import Gurobi_BNN
 from helper.misc import inference, calc_accuracy
 from helper.save_data import DataSaver
+from globals import ARCHITECTURES
 import argparse
 
-ARCHITECTURES = {
-  1: [784, 10],
-  2: [784, 16, 10],
-  3: [784, 16, 16, 10]
-}
 
 
 if __name__ == '__main__':
 
   parser = argparse.ArgumentParser(description='Optional app description')
 
+  parser.add_argument('--solver', default="gurobi", type=str)
   parser.add_argument('--arch', default=2, type=int)
   parser.add_argument('--ex', default=3, type=int)
   parser.add_argument('--focus', default=3, type=int)
@@ -21,6 +20,7 @@ if __name__ == '__main__':
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
   args = parser.parse_args()
   
+  solver = args.solver
   architecture = ARCHITECTURES[args.arch]
   numExamples = args.ex
   focus = args.focus
@@ -28,11 +28,16 @@ if __name__ == '__main__':
 
   print(args)
 
-  bnn = BNN(numExamples, architecture)
+  if solver == 'gurobi':
+    bnn = Gurobi_BNN(numExamples, architecture)
+  elif solver =='cplex':
+    bnn = Cplex_BNN(numExamples, architecture)
+  else:
+    raise Exception("Solver %s not known" % solver)
   bnn.train(time*60, focus)
 
-  obj = bnn.m.getObjective()
-  print("Objective value: ", obj.getValue())
+  obj = bnn.get_objective()
+  print("Objective value: ", obj)
 
   varMatrices = bnn.extract_values()
 
@@ -46,7 +51,11 @@ if __name__ == '__main__':
   print("Testing accuracy: %s " % (test_acc))
 
   if args.save:
-    DS = DataSaver(bnn, architecture, numExamples, focus, time)
-    DS.plot_periodic()
+    if solver == 'gurobi':
+      progress = bnn.m._progress
+    else:
+      progress = bnn.progress
+    DS = DataSaver(bnn, architecture, numExamples, focus, solver)
+    DS.plot_periodic(progress)
     DS.save_json(train_acc, test_acc)
 
