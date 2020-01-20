@@ -7,3 +7,5 @@ ARCHITECTURES = {
 INT = 0
 BIN = 1
 CONT = 2
+
+EPSILON = 1

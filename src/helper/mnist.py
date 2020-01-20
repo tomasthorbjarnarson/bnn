@@ -3,6 +3,7 @@ from mlxtend.preprocessing import one_hot
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import random
 
 def preprocess_mnist(set_x):
   # Keep this for later
@@ -21,7 +22,9 @@ def get_unique_examples(train_x, train_y, N):
 
   return indices[0:N]
 
-def load_mnist(N):
+def load_mnist(N, seed):
+
+  random.seed(seed)
 
   og_train_x, og_train_y = loadlocal_mnist(
           images_path='data/raw/train-images-idx3-ubyte', 
@@ -30,6 +33,13 @@ def load_mnist(N):
   test_x, test_y = loadlocal_mnist(
           images_path='data/raw/t10k-images-idx3-ubyte', 
           labels_path='data/raw/t10k-labels-idx1-ubyte')
+
+  og_train_indices = [x for x in range(len(og_train_x))]
+  if seed:
+    random.shuffle(og_train_indices)
+
+  og_train_x = og_train_x[og_train_indices]
+  og_train_y = og_train_y[og_train_indices]
 
   max_num = len(og_train_y)
 

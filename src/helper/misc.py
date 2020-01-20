@@ -1,4 +1,7 @@
 import numpy as np
+import random
+
+seed = 0
 
 def numpy_sign(varMatrix):
   signVarMatrix = varMatrix
@@ -8,9 +11,7 @@ def numpy_sign(varMatrix):
 
 def inference(set_x, varMatrices, architecture):
   N_test, input_size = np.shape(set_x)
-  
-  output = []
-  
+    
   infer = set_x
 
   for lastLayer, neurons_out in enumerate(architecture[1:]):
@@ -21,12 +22,27 @@ def inference(set_x, varMatrices, architecture):
     if layer < len(architecture) - 1:
       infer = numpy_sign(infer)
 
+  output = all_ok(infer)
+  #output = all_ok(infer)
+  return output
+
+def all_good(infer):
+  output = []
   for row in np.transpose(infer):
     label = np.argwhere(row >= 0)
     if len(label) == 1 and len(label[0]) == 1:
       label = label[0][0]
     else:
       label = -1
+    output.append(label)
+  return output
+
+def all_ok(infer):
+  random.seed(seed)
+  output = []
+  for row in np.transpose(infer):
+    label = np.argwhere(row == np.max(row))
+    label = random.choice(label)[0]
     output.append(label)
   return output
 

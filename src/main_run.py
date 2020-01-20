@@ -1,11 +1,11 @@
-from milp.bnn import BNN
 from milp.cplex_bnn import Cplex_BNN
 from milp.gurobi_bnn import Gurobi_BNN
 from helper.misc import inference, calc_accuracy
 from helper.save_data import DataSaver
+from helper.mnist import imshow
 from globals import ARCHITECTURES
 import argparse
-
+import numpy as np
 
 
 if __name__ == '__main__':
@@ -17,6 +17,8 @@ if __name__ == '__main__':
   parser.add_argument('--ex', default=3, type=int)
   parser.add_argument('--focus', default=3, type=int)
   parser.add_argument('--time', default=1, type=float)
+  parser.add_argument('--seed', default=0, type=int)
+  parser.add_argument('--obj', default="min_w", type=str)
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
   args = parser.parse_args()
   
@@ -25,13 +27,15 @@ if __name__ == '__main__':
   numExamples = args.ex
   focus = args.focus
   time = args.time
+  seed = args.seed
+  obj = args.obj
 
   print(args)
 
   if solver == 'gurobi':
-    bnn = Gurobi_BNN(numExamples, architecture)
+    bnn = Gurobi_BNN(numExamples, architecture, obj, seed)
   elif solver =='cplex':
-    bnn = Cplex_BNN(numExamples, architecture)
+    bnn = Cplex_BNN(numExamples, architecture, obj, seed)
   else:
     raise Exception("Solver %s not known" % solver)
   bnn.train(time*60, focus)
@@ -40,6 +44,11 @@ if __name__ == '__main__':
   print("Objective value: ", obj)
 
   varMatrices = bnn.extract_values()
+
+  if False:
+    tmp = np.abs(varMatrices['w_1'])
+    tmp = np.sum(tmp, axis=1)
+    imshow(tmp)
 
   infer_train = inference(bnn.train_x, varMatrices, bnn.architecture)
   infer_test = inference(bnn.test_x, varMatrices, bnn.architecture)

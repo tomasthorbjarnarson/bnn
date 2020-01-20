@@ -6,11 +6,11 @@ from helper.misc import inference, calc_accuracy
 from globals import INT, BIN, CONT
 
 class Gurobi_BNN(BNN):
-  def __init__(self, N, architecture, log=True):
+  def __init__(self, N, architecture, obj, seed=0, log=True):
     model = gp.Model("Gurobi_BNN")
     if not log:
       model.setParam("OutputFlag", 0)
-    BNN.__init__(self, model, N, architecture)
+    BNN.__init__(self, model, N, architecture, obj, seed)
     
   def add_var(self, precision, name, bound=0):
     if precision == INT:
@@ -44,13 +44,17 @@ class Gurobi_BNN(BNN):
     self.m.optimize(mycallback)
 
     # Add last value after optimisation finishes
-    gap = 1 - self.m.ObjBound/self.m.ObjVal
+    gap = 1 - self.m.ObjBound/(self.m.ObjVal + 1e-15)
     if gap != self.m._progress[-1][4]:
       self.m._progress.append((self.m.NodeCount, self.m.ObjVal, self.m.ObjBound, self.m.Runtime, gap))
 
   def get_objective(self):
     obj = self.m.getObjective()
-    return obj.getValue()
+    try:
+      obj = obj.getValue()
+    except:
+      obj = -1
+    return obj
 
   def get_runtime(self):
     return self.m.Runtime
@@ -82,7 +86,7 @@ class Gurobi_BNN(BNN):
 def mycallback(model, where):
   if where == GRB.Callback.MIP:
     nodecnt = model.cbGet(GRB.Callback.MIP_NODCNT)
-    objbst = model.cbGet(GRB.Callback.MIP_OBJBST)
+    objbst = model.cbGet(GRB.Callback.MIP_OBJBST) + 1e-15
     objbnd = model.cbGet(GRB.Callback.MIP_OBJBND)
     runtime = model.cbGet(GRB.Callback.RUNTIME)
     gap = 1 - objbnd/objbst
@@ -92,7 +96,7 @@ def mycallback(model, where):
       model._progress.append((nodecnt, objbst, objbnd, runtime, gap, model._val_acc))
   elif where == GRB.Callback.MIPSOL:
     nodecnt = model.cbGet(GRB.Callback.MIPSOL_NODCNT)
-    objbst = model.cbGet(GRB.Callback.MIPSOL_OBJBST)
+    objbst = model.cbGet(GRB.Callback.MIPSOL_OBJBST) + 1e-15
     objbnd = model.cbGet(GRB.Callback.MIPSOL_OBJBND)
     runtime = model.cbGet(GRB.Callback.RUNTIME)
     gap = 1 - objbnd/objbst
@@ -114,7 +118,7 @@ def mycallback(model, where):
 
     infer_test = inference(model._val_x, varMatrices, model._architecture)
     val_acc = calc_accuracy(infer_test, model._val_y)
-    #print("Validation accuracy: %s " % (val_acc))
+    print("Validation accuracy: %s " % (val_acc))
 
     model._progress.append((nodecnt, objbst, objbnd, runtime, gap, val_acc))
     model._val_acc = val_acc

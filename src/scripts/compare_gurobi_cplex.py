@@ -25,7 +25,7 @@ focuses = {
 
 log = True
 
-def compare():
+def compare_gurobi_cplex():
   for i in ARCHITECTURES:
     arch = ARCHITECTURES[i]
     time = times[i]
@@ -56,6 +56,7 @@ def compare():
     Gurobi_y = [z[1] for z in Gurobi_results]
     Cplex_y = [z[1] for z in Cplex_results]
 
+    plt.figure(i)
     plt.plot(x, Gurobi_y, label="Gurobi runtime")
     plt.plot(x, Cplex_y, label="Cplex runtime")
     for j in range(len(Gurobi_results)):

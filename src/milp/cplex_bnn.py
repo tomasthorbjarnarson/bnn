@@ -7,10 +7,10 @@ from helper.misc import inference, calc_accuracy
 from globals import INT, BIN, CONT
 
 class Cplex_BNN(BNN):
-  def __init__(self, N, architecture, log=True):
+  def __init__(self, N, architecture, obj, seed=0, log=True):
     self.log = log
     model = Model("Cplex_BNN", log_output=log)
-    BNN.__init__(self, model, N, architecture)
+    BNN.__init__(self, model, N, architecture, obj, seed)
     
   def add_var(self, precision, name, bound=0):
     if precision == INT:
@@ -77,6 +77,7 @@ class MyProgressListener(SolutionListener):
     self.progress = []
     self.lastobjbst = math.inf
     self.lastobjbnd = -math.inf
+    self.last_gap = 1
     self.last_obj = math.inf
     self.val_acc = 0
     self.model = model
@@ -118,8 +119,9 @@ class MyProgressListener(SolutionListener):
     objbnd  = progress_data.best_bound
     runtime = progress_data.time
     gap     = progress_data.mip_gap
-    if objbst < self.lastobjbst or objbnd > self.lastobjbnd:
+    if self.last_gap - gap > 0.01 and (objbst < self.lastobjbst or objbnd > self.lastobjbnd):
       self.progress.append((nodecnt, objbst, objbnd, runtime, gap, self.val_acc))
+      self.last_gap = gap
 
   def notify_end(self, status, objective):
     if status:
