@@ -16,7 +16,7 @@ def preprocess_mnist(set_x):
 def get_unique_examples(train_x, train_y, N):
   ex_per_class = math.ceil(N / 10)
   indices = []
-  for i, ex in enumerate(train_x):
+  for i, ex in enumerate(np.transpose(train_x)):
     if len(indices) < ex_per_class*10 and np.count_nonzero(train_y[indices] == train_y[i]) < ex_per_class:
       indices.append(i)
 

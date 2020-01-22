@@ -2,6 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 from milp.bnn import BNN
+from milp.new_bnn import NewBNN
 from helper.misc import inference, calc_accuracy
 from globals import INT, BIN, CONT
 
@@ -26,7 +27,7 @@ class Gurobi_BNN(BNN):
     self.m.addConstr(constraint)
 
   def train(self, time=None, focus=None):
-    self.m.setObjective(self.objSum , GRB.MINIMIZE)
+    self.m.setObjective(self.objSum, GRB.MINIMIZE)
     if time:
       self.m.setParam('TimeLimit', time)
     if focus:
@@ -36,6 +37,7 @@ class Gurobi_BNN(BNN):
     self.m._progress = []
     self.m._weights = self.weights
     self.m._biases = self.biases
+    #self.m._H = self.H
     self.m._val_x = self.val_x
     self.m._val_y = self.val_y
     self.m._architecture = self.architecture
@@ -115,10 +117,16 @@ def mycallback(model, where):
             varMatrices["w_%s" % layer][i,j] = model.cbGetSolution(model._weights[layer][i,j])
       for i in range(b_shape[0]):
         varMatrices["b_%s" % layer][i] = model.cbGetSolution(model._biases[layer][i])
+      #if layer < len(model._architecture) - 1:
+      #  h_shape = model._H[layer].shape
+      #  varMatrices["H_%s" % layer] = np.zeros(h_shape)
+      #  for i in range(h_shape[0]):
+      #    varMatrices["H_%s" % layer][i] = model.cbGetSolution(model._H[layer][i])
+      #  print("# neurons in HL %s: %s" % (layer, varMatrices["H_%s" % layer].sum()))
 
     infer_test = inference(model._val_x, varMatrices, model._architecture)
     val_acc = calc_accuracy(infer_test, model._val_y)
-    print("Validation accuracy: %s " % (val_acc))
+    #print("Validation accuracy: %s " % (val_acc))
 
     model._progress.append((nodecnt, objbst, objbnd, runtime, gap, val_acc))
     model._val_acc = val_acc

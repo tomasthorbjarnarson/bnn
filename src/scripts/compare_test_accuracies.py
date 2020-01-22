@@ -3,11 +3,11 @@ import subprocess
 import re
 import matplotlib.pyplot as plt
 import numpy as np
+import pathlib
+from datetime import datetime
 from globals import ARCHITECTURES
 from helper.misc import inference, calc_accuracy
 from milp.gurobi_bnn import Gurobi_BNN as bnn
-
-from pdb import set_trace
 
 Icarte_dir = '/home/tomas/Documents/TUDelft/Thesis/Icarte/bnn/src'
 
@@ -19,14 +19,14 @@ num_examples = {
 
 seeds = [1,2,3,4,5]
 
-short = True
-TIME = 10
+short = False
+TIME = 15
 if short:
   num_examples = {
-    1: [1,2,3],
-    2: [1, 2],
+    1: [1,2,3,4,5],
+    2: [1,2,3],
   }
-  seeds = [10,20]
+  seeds = [1,2]
   ARCHITECTURES.pop(3)
   TIME = 1
 
@@ -40,15 +40,29 @@ def get_mean_std(results):
   std = [np.std(z[0]) for z in results]
   return mean, std
 
+def get_time_left(arch, example, experiment):
+  num_experiments = 3
+  num_ex = num_examples[arch]
+  num_ex = num_ex[num_ex.index(example):]
+  if arch == 1:
+    examples_left = len(num_ex) + len(num_examples[2]) + len(num_examples[3])
+  elif arch == 2:
+    examples_left = len(num_ex) + len(num_examples[3])
+  else:
+    examples_left = len(num_ex)
+
+  return examples_left*len(seeds)*(num_experiments-experiment+1)*TIME
 
 def compare_test_accuracies():
 
+  clear_print("Starting script, max time left: %s minutes" % get_time_left(1,1,1))
+
   print("Running min-w BNN experiments!")
-  min_w_results = run_bnn_experiments("min_w")
+  min_w_results = run_bnn_experiments("min_w", 1)
   print("Running max-acc BNN experiments!")  
-  max_acc_results = run_bnn_experiments("max_acc")
+  max_acc_results = run_bnn_experiments("max_acc", 2)
   print("Running GD experiments!")
-  gd_results = run_gd_experiments()
+  gd_results = run_gd_experiments(3)
 
   for i in min_w_results:
     x = [10*z for z in num_examples[i]]
@@ -63,9 +77,14 @@ def compare_test_accuracies():
     plt.xlabel("Number of examples")
     plt.ylabel("Test performance %")
     plt.title("Compare test accuracies")
+    plot_dir = "results/plots/compare_test_accuracies"
+    pathlib.Path(plot_dir).mkdir(exist_ok=True)
+    title = "#HL:%s_Time:%s" % (i-1, datetime.now().strftime("%d %b %H:%M"))
+    plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
+
     plt.show()
 
-def run_gd_experiments():
+def run_gd_experiments(experiment):
   current_dir = os.getcwd()
   os.chdir(Icarte_dir)
   gd_results = {}
@@ -76,6 +95,7 @@ def run_gd_experiments():
     for N in num_examples[i]:
       acc = []
       runtime = []
+      clear_print("Max time left: %s" % get_time_left(i, N,experiment))
       for s in seeds:
         clear_print("GD:  hls: %s, N: %s, Seed: %s" % (hls, N, s))
 
@@ -92,7 +112,7 @@ def run_gd_experiments():
 
   return gd_results
 
-def run_bnn_experiments(obj):
+def run_bnn_experiments(obj, experiment):
   bnn_results = {}
   for i in ARCHITECTURES:
     bnn_results[i] = []
@@ -100,6 +120,7 @@ def run_bnn_experiments(obj):
     for N in num_examples[i]:
       acc = []
       runtime = []
+      clear_print("Max time left: %s" % get_time_left(i, N,experiment))
       for s in seeds:
         clear_print("%s:  Arch: %s, N: %s, Seed: %s" % (obj, arch, N, s))
         Gurobi_BNN = bnn(N*10, arch, obj, s, False)

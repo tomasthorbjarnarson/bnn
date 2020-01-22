@@ -108,10 +108,8 @@ class BNN:
       self.calc_objective()
 
   def add_max_acc_output_constraints(self, n_out, example, pre_activation):
-    if self.oh_train_y[n_out,example] > 0:
-      self.add_constraint((self.output[example,n_out] == 1) >> (pre_activation >= 0))
-    else:
-      self.add_constraint((self.output[example,n_out] == 0) >> (pre_activation <= -EPSILON))
+    self.add_constraint((self.output[example,n_out] == 1) >> (pre_activation >= 0))
+    self.add_constraint((self.output[example,n_out] == 0) >> (pre_activation <= -EPSILON))
 
   def add_output_constraints(self, n_out, example, pre_activation):
     if self.oh_train_y[n_out,example] > 0:
@@ -132,6 +130,7 @@ class BNN:
       for j in range(self.architecture[-1]):
         if self.oh_train_y[j,k] > 0:
           self.objSum -= self.output[k,j]
+    #self.add_constraint(self.objSum >= np.floor(self.N*0.05))
     #self.regularizer = 0
     #for layer in self.abs_weights:
     #  self.regularizer += self.abs_weights[layer].sum()
@@ -171,7 +170,8 @@ class BNN:
       if layer < len(self.architecture) - 1:
         varMatrices["act_%s" %layer] = get_val(self.act[layer])
 
-    #varMatrices["output"] = get_val(self.output)
+    if self.obj == "max_acc":
+      varMatrices["output"] = get_val(self.output)
 
     return varMatrices
 

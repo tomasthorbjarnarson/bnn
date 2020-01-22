@@ -23,7 +23,7 @@ def inference(set_x, varMatrices, architecture):
       infer = numpy_sign(infer)
 
   output = all_ok(infer)
-  #output = all_ok(infer)
+  #output = all_good(infer)
   return output
 
 def all_good(infer):
