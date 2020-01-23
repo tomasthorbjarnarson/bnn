@@ -1,5 +1,6 @@
 import os
 import subprocess
+from subprocess import PIPE
 import re
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,7 +10,7 @@ from globals import ARCHITECTURES
 from helper.misc import inference, calc_accuracy
 from milp.gurobi_bnn import Gurobi_BNN as bnn
 
-Icarte_dir = '/home/tomas/Documents/TUDelft/Thesis/Icarte/bnn/src'
+Icarte_dir = '../Icarte/bnn/src'
 
 num_examples = {
   1: [1,2,3,4,5,6,7,8,9,10],
@@ -19,15 +20,15 @@ num_examples = {
 
 seeds = [1,2,3,4,5]
 
-short = False
+short = True
 TIME = 15
 if short:
   num_examples = {
     1: [1,2,3,4,5],
     2: [1,2,3],
+    3: [1]
   }
   seeds = [1,2]
-  ARCHITECTURES.pop(3)
   TIME = 1
 
 def clear_print(text):
@@ -51,7 +52,12 @@ def get_time_left(arch, example, experiment):
   else:
     examples_left = len(num_ex)
 
-  return examples_left*len(seeds)*(num_experiments-experiment+1)*TIME
+  total_ex = (len(num_examples[1]) + len(num_examples[2]) + len(num_examples[3]))
+  total_time = total_ex*len(seeds)*num_experiments*TIME
+
+  ex_finished = total_ex*(experiment-1) + total_ex-examples_left
+
+  return total_time - ex_finished*len(seeds)*TIME
 
 def compare_test_accuracies():
 
@@ -82,7 +88,7 @@ def compare_test_accuracies():
     title = "#HL:%s_Time:%s" % (i-1, datetime.now().strftime("%d %b %H:%M"))
     plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
-    plt.show()
+    #plt.show()
 
 def run_gd_experiments(experiment):
   current_dir = os.getcwd()
@@ -99,7 +105,7 @@ def run_gd_experiments(experiment):
       for s in seeds:
         clear_print("GD:  hls: %s, N: %s, Seed: %s" % (hls, N, s))
 
-        result = subprocess.run(run_str % (s, hls, N, TIME), shell=True, capture_output=True)
+        result = subprocess.run(run_str % (s, hls, N, TIME), shell=True, stdout=PIPE, stderr=PIPE)
         test_perf = re.findall(b"Test .*", result.stdout)[0]
         time = re.findall(b"= .*\[s]", result.stdout)[0]
         test_perf = float(test_perf[-4:])*100
