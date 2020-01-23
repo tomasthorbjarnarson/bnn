@@ -107,9 +107,9 @@ def run_gd_experiments(experiment):
 
         result = subprocess.run(run_str % (s, hls, N, TIME), shell=True, stdout=PIPE, stderr=PIPE)
         test_perf = re.findall(b"Test .*", result.stdout)[0]
-        time = re.findall(b"= .*\[s]", result.stdout)[0]
+        time = re.findall(b"= .*\[m]", result.stdout)[0]
         test_perf = float(test_perf[-4:])*100
-        time = float(time[1:-3])
+        time = float(time[1:-3])*60
         acc.append(test_perf)
         runtime.append(time)
       gd_results[i].append((acc, runtime))
