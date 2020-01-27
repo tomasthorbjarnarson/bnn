@@ -1,5 +1,6 @@
-from milp.gurobi_bnn import Gurobi_BNN as BNN1
-from milp.cplex_bnn import Cplex_BNN as BNN2
+from milp.gurobi_bnn import get_gurobi_bnn
+from milp.cplex_bnn import get_cplex_bnn
+from milp.min_w_bnn import MIN_W_BNN
 from datetime import datetime
 from globals import ARCHITECTURES
 import matplotlib.pyplot as plt
@@ -35,8 +36,8 @@ def compare_gurobi_cplex():
     Cplex_results = []
     for N in examples:
       print("Architecture: %s. # Examples: %s" % (arch, N))
-      Gurobi_BNN = BNN1(N, arch, log=log)
-      Cplex_BNN = BNN2(N, arch, log=log)
+      Gurobi_BNN = get_gurobi_bnn(MIN_W_BNN, N, arch, log=log)
+      Cplex_BNN = get_cplex_bnn(MIN_W_BNN, N, arch, log=log)
 
       Gurobi_BNN.train(60*time, focus)
       Cplex_BNN.train(60*time, focus)

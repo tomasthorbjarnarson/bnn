@@ -5,10 +5,14 @@ import re
 import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
+import json
 from datetime import datetime
 from globals import ARCHITECTURES
 from helper.misc import inference, calc_accuracy
-from milp.gurobi_bnn import Gurobi_BNN as bnn
+from milp.gurobi_bnn import get_gurobi_bnn
+from milp.min_w_bnn import MIN_W_BNN
+from milp.max_correct_bnn import MAX_CORRECT_BNN
+from milp.min_hinge_bnn import MIN_HINGE_BNN
 
 Icarte_dir = '../Icarte/bnn/src'
 
@@ -18,79 +22,106 @@ num_examples = {
   3: [1,2,3]
 }
 
+times = {
+  1: 15,
+  2: 60,
+  3: 60
+}
 seeds = [1,2,3,4,5]
 
-short = True
-TIME = 15
+milps = {
+  "min_w": MIN_W_BNN,
+  "max_correct": MAX_CORRECT_BNN,
+  "min_hinge": MIN_HINGE_BNN
+}
+
+
+short = False
 if short:
   num_examples = {
-    1: [1,2,3,4,5],
-    2: [1,2,3],
+    1: [1,2,3],
+    2: [1,2],
     3: [1]
   }
   seeds = [1,2]
-  TIME = 1
+  times = {
+    1: 1,
+    2: 1,
+    3: 1
+  }
 
-def clear_print(text):
-  print("====================================")
-  print(text)
-  print("====================================")
+def compare_test_accuracies(losses, plot=False):
 
-def get_mean_std(results):
-  mean = [np.mean(z[0]) for z in results]
-  std = [np.std(z[0]) for z in results]
-  return mean, std
+  all_results = {k: [] for k in losses}
+  all_results = {}
+  num_experiments = len(losses)
 
-def get_time_left(arch, example, experiment):
-  num_experiments = 3
-  num_ex = num_examples[arch]
-  num_ex = num_ex[num_ex.index(example):]
-  if arch == 1:
-    examples_left = len(num_ex) + len(num_examples[2]) + len(num_examples[3])
-  elif arch == 2:
-    examples_left = len(num_ex) + len(num_examples[3])
-  else:
-    examples_left = len(num_ex)
+  clear_print("Starting script, max time left: %s minutes" % get_time_left(1,1,1, num_experiments))
 
-  total_ex = (len(num_examples[1]) + len(num_examples[2]) + len(num_examples[3]))
-  total_time = total_ex*len(seeds)*num_experiments*TIME
+  i = 0
+  json_dir = "results/json/compare_test_accuracies"
+  pathlib.Path(json_dir).mkdir(exist_ok=True)
 
-  ex_finished = total_ex*(experiment-1) + total_ex-examples_left
+  for loss in losses:
+    i += 1
+    print("Running %s BNN experiments!" % loss)
+    timestr = "%s-%s-%s" % (times[1], times[2], times[3])
+    file_name = "%s-Times:%s_S:%s" % (loss, timestr, len(seeds))
+    json_path = "%s/%s.json" % (json_dir, file_name)
+    if pathlib.Path(json_path).is_file():
+      print("Path %s exists" % json_path)
+      with open(json_path, "r") as f:
+        data = json.loads(f.read())
+        tmp = data["results"]
+        all_results[loss] = {}
+        for k in tmp:
+          all_results[loss][int(k)] = tmp[k]
+      continue
 
-  return total_time - ex_finished*len(seeds)*TIME
+    if loss in milps:
+      all_results[loss] = run_bnn_experiments(loss, i, num_experiments)
+    elif loss == "gd":
+      all_results["gd"] = run_gd_experiments(i, num_experiments)
+    else:
+      print("Loss %s unknown" % loss)
+      continue
+    with open(json_path, "w") as f:
+      data = {"results": all_results[loss], "ts": datetime.now().strftime("%d-%m-%H:%M")}
+      json.dump(data, f)
 
-def compare_test_accuracies():
-
-  clear_print("Starting script, max time left: %s minutes" % get_time_left(1,1,1))
-
-  print("Running min-w BNN experiments!")
-  min_w_results = run_bnn_experiments("min_w", 1)
-  print("Running max-acc BNN experiments!")  
-  max_acc_results = run_bnn_experiments("max_acc", 2)
-  print("Running GD experiments!")
-  gd_results = run_gd_experiments(3)
-
-  for i in min_w_results:
+  for i in all_results[losses[0]]:
     x = [10*z for z in num_examples[i]]
-    min_w_y, min_w_err = get_mean_std(min_w_results[i])
-    max_acc_y, max_acc_err = get_mean_std(max_acc_results[i])
-    gd_y, gd_err = get_mean_std(gd_results[i])
     plt.figure(i)
-    plt.errorbar(x, min_w_y, yerr=min_w_err, capsize=1, label="Min-w test performance")
-    plt.errorbar(x, max_acc_y, yerr=max_acc_err, capsize=1, label="Max-acc test performance")
-    plt.errorbar(x, gd_y, yerr=gd_err, capsize=1, label="GD test performance")
+    for loss in losses:
+      y, err = get_acc_mean_std(all_results[loss][i])
+      plt.errorbar(x, y, yerr=err, capsize=1, label="%s test performance" % loss)
     plt.legend()
     plt.xlabel("Number of examples")
     plt.ylabel("Test performance %")
     plt.title("Compare test accuracies")
     plot_dir = "results/plots/compare_test_accuracies"
     pathlib.Path(plot_dir).mkdir(exist_ok=True)
-    title = "#HL:%s_Time:%s" % (i-1, datetime.now().strftime("%d %b %H:%M"))
-    plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
+    title = "#HL:%s-Time:%s-S:%s_TS:%s" % (i-1, times[i], len(seeds), datetime.now().strftime("%d-%m-%H:%M"))
+    if plot:
+      plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
-    #plt.show()
+  for i in all_results[losses[0]]:
+    x = [10*z for z in num_examples[i]]
+    plt.figure(i*10)
+    for loss in losses:
+      y, err = get_runtime_mean_std(all_results[loss][i])
+      plt.errorbar(x, y, yerr=err, capsize=1, label="%s test performance" % loss)
+    plt.legend()
+    plt.xlabel("Number of examples")
+    plt.ylabel("Runtime [s]")
+    plt.title("Compare runtimes")
+    plot_dir = "results/plots/compare_loss_runtimes"
+    pathlib.Path(plot_dir).mkdir(exist_ok=True)
+    title = "#HL:%s-Time:%s-S:%s_TS:%s" % (i-1, times[i], len(seeds), datetime.now().strftime("%d-%m-%H:%M"))
+    if plot:
+      plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
-def run_gd_experiments(experiment):
+def run_gd_experiments(experiment, num_experiments):
   current_dir = os.getcwd()
   os.chdir(Icarte_dir)
   gd_results = {}
@@ -101,11 +132,11 @@ def run_gd_experiments(experiment):
     for N in num_examples[i]:
       acc = []
       runtime = []
-      clear_print("Max time left: %s" % get_time_left(i, N,experiment))
+      clear_print("Max time left: %s" % get_time_left(i, N, experiment, num_experiments))
       for s in seeds:
         clear_print("GD:  hls: %s, N: %s, Seed: %s" % (hls, N, s))
 
-        result = subprocess.run(run_str % (s, hls, N, TIME), shell=True, stdout=PIPE, stderr=PIPE)
+        result = subprocess.run(run_str % (s, hls, N, times[i]), shell=True, stdout=PIPE, stderr=PIPE)
         test_perf = re.findall(b"Test .*", result.stdout)[0]
         time = re.findall(b"= .*\[m]", result.stdout)[0]
         test_perf = float(test_perf[-4:])*100
@@ -118,28 +149,70 @@ def run_gd_experiments(experiment):
 
   return gd_results
 
-def run_bnn_experiments(obj, experiment):
+def run_bnn_experiments(loss, experiment, num_experiments):
   bnn_results = {}
+  
   for i in ARCHITECTURES:
     bnn_results[i] = []
     arch = ARCHITECTURES[i]
     for N in num_examples[i]:
-      acc = []
-      runtime = []
-      clear_print("Max time left: %s" % get_time_left(i, N,experiment))
+      accs = []
+      runtimes = []
+      clear_print("Max time left: %s" % get_time_left(i, N, experiment, num_experiments))
       for s in seeds:
-        clear_print("%s:  Arch: %s, N: %s, Seed: %s" % (obj, arch, N, s))
-        Gurobi_BNN = bnn(N*10, arch, obj, s, False)
-        Gurobi_BNN.train(60*TIME, 0)
-        Gurobi_obj = Gurobi_BNN.get_objective()
-        Gurobi_runtime = Gurobi_BNN.get_runtime()
-        varMatrices = Gurobi_BNN.extract_values()
+        clear_print("%s:  Arch: %s, N: %s, Seed: %s" % (loss, arch, N, s))
+        bnn = get_gurobi_bnn(milps[loss],N*10, arch, s)
+        bnn.train(60*times[i], 0)
+        obj = bnn.get_objective()
+        runtime = bnn.get_runtime()
+        varMatrices = bnn.extract_values()
 
-        infer_test = inference(Gurobi_BNN.test_x, varMatrices, Gurobi_BNN.architecture)
-        test_acc = calc_accuracy(infer_test, Gurobi_BNN.test_y)
-        acc.append(test_acc)
-        runtime.append(Gurobi_runtime)
+        infer_test = inference(bnn.data["test_x"], varMatrices, bnn.architecture)
+        test_acc = calc_accuracy(infer_test, bnn.data["test_y"])
+        accs.append(test_acc)
+        runtimes.append(runtime)
 
-      bnn_results[i].append((acc, runtime))
+      bnn_results[i].append((accs, runtimes))
 
   return bnn_results
+
+
+def clear_print(text):
+  print("====================================")
+  print(text)
+  print("====================================")
+
+def get_acc_mean_std(results):
+  mean = [np.mean(z[0]) for z in results]
+  std = [np.std(z[0]) for z in results]
+  return mean, std
+
+def get_runtime_mean_std(results):
+  mean = [np.mean(z[1]) for z in results]
+  std = [np.std(z[1]) for z in results]
+  return mean, std
+
+def get_time_left(arch, example, experiment, num_experiments):
+  time_left = 0
+
+  for j in range(num_experiments):
+    if j == experiment - 1:
+      for i in num_examples:
+        if i == arch :
+          for k in num_examples[i][example-1:]:
+            time_left += times[i]*len(seeds)
+        elif i > arch:
+          for k in num_examples[i]:
+            time_left += times[i]*len(seeds)
+    elif j > experiment - 1:
+      for i in num_examples:
+        for k in num_examples[i]:
+            time_left += times[i]*len(seeds)
+
+  days = time_left // (60*24)
+  time_left -= days*60*24
+  hours = time_left // 60
+  time_left -= hours*60
+  minutes = time_left % 60
+
+  return "%s days, %s hours, %s minutes" % (days, hours, minutes)

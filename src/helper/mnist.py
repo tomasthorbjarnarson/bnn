@@ -7,9 +7,9 @@ import random
 
 def preprocess_mnist(set_x):
   # Keep this for later
-  #proc_x = set_x/255
+  proc_x = set_x/255
   # Use this to simply set to float
-  proc_x = set_x / 1.0
+  #proc_x = set_x / 1.0
   proc_x = np.transpose(proc_x)
   return proc_x
 
@@ -63,7 +63,19 @@ def load_mnist(N, seed):
   oh_test_y = 2*one_hot(test_y, num_labels=10)-1
   oh_test_y = np.transpose(oh_test_y)
 
-  return train_x, train_y, oh_train_y, val_x, val_y, oh_val_y, test_x, test_y, oh_test_y
+  data = {
+    "train_x": train_x,
+    "train_y": train_y,
+    "oh_train_y": oh_train_y,
+    "val_x": val_x,
+    "val_y": val_y,
+    "oh_val_y": oh_val_y,
+    "test_x": test_x,
+    "test_y": test_y,
+    "oh_test_y": oh_test_y,
+  }
+
+  return data
 
 
 def imshow(example):

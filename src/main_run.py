@@ -1,12 +1,18 @@
-from milp.cplex_bnn import Cplex_BNN
-from milp.gurobi_bnn import Gurobi_BNN
+from milp.cplex_bnn import get_cplex_bnn
+from milp.gurobi_bnn import get_gurobi_bnn
+from milp.min_w_bnn import MIN_W_BNN
+from milp.max_correct_bnn import MAX_CORRECT_BNN
+from milp.min_hinge_bnn import MIN_HINGE_BNN
 from helper.misc import inference, calc_accuracy
 from helper.save_data import DataSaver
-from helper.mnist import imshow
-from globals import ARCHITECTURES
+from globals import ARCHITECTURES, set_log
 import argparse
-import numpy as np
 
+milps = {
+  "min_w": MIN_W_BNN,
+  "max_correct": MAX_CORRECT_BNN,
+  "min_hinge": MIN_HINGE_BNN
+}  
 
 if __name__ == '__main__':
 
@@ -18,8 +24,9 @@ if __name__ == '__main__':
   parser.add_argument('--focus', default=3, type=int)
   parser.add_argument('--time', default=1, type=float)
   parser.add_argument('--seed', default=0, type=int)
-  parser.add_argument('--obj', default="min_w", type=str)
+  parser.add_argument('--loss', default="min_w", type=str)
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
+  parser.add_argument('--log', action='store_true', help="An optional flag to save data")
   args = parser.parse_args()
   
   solver = args.solver
@@ -28,14 +35,20 @@ if __name__ == '__main__':
   focus = args.focus
   time = args.time
   seed = args.seed
-  obj = args.obj
+  loss = args.loss
+  log = args.log
+
+  set_log(log)
 
   print(args)
 
+  if loss not in milps:
+    raise Exception("MILP model not known")
+
   if solver == 'gurobi':
-    bnn = Gurobi_BNN(numExamples, architecture, obj, seed)
+    bnn = get_gurobi_bnn(milps[loss], numExamples, architecture, seed)
   elif solver =='cplex':
-    bnn = Cplex_BNN(numExamples, architecture, obj, seed)
+    bnn = get_cplex_bnn(milps[loss], numExamples, architecture, seed)
   else:
     raise Exception("Solver %s not known" % solver)
   bnn.train(time*60, focus)
@@ -45,19 +58,17 @@ if __name__ == '__main__':
 
   varMatrices = bnn.extract_values()
 
-  if False:
-    tmp = np.abs(varMatrices['w_1'])
-    tmp = np.sum(tmp, axis=1)
-    imshow(tmp)
+  infer_train = inference(bnn.data["train_x"], varMatrices, bnn.architecture)
+  infer_test = inference(bnn.data["test_x"], varMatrices, bnn.architecture)
 
-  infer_train = inference(bnn.train_x, varMatrices, bnn.architecture)
-  infer_test = inference(bnn.test_x, varMatrices, bnn.architecture)
-
-  train_acc = calc_accuracy(infer_train, bnn.train_y)
-  test_acc = calc_accuracy(infer_test, bnn.test_y)
+  train_acc = calc_accuracy(infer_train, bnn.data["train_y"])
+  test_acc = calc_accuracy(infer_test, bnn.data["test_y"])
 
   print("Training accuracy: %s " % (train_acc))
   print("Testing accuracy: %s " % (test_acc))
+
+  #from pdb import set_trace
+  #set_trace()
 
   if args.save:
     if solver == 'gurobi':
