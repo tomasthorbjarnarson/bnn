@@ -28,7 +28,7 @@ class BNN:
     self.var_c = {}
     self.act = {}
 
-    bound = 1
+    self.bound = 1
     # All pixels that are 0 in every example are considered dead
     dead = np.all(self.train_x == 0, axis=1)
 
@@ -50,13 +50,13 @@ class BNN:
             # Dead inputs should have 0 weight
             self.weights[layer][i,j] = 0
           else:
-            self.weights[layer][i,j] = self.add_var(INT,"w_%s-%s_%s" % (layer,i,j), bound)
+            self.weights[layer][i,j] = self.add_var(INT,"w_%s-%s_%s" % (layer,i,j), self.bound)
           if layer > 1:
             # Var c only needed after first activation
             for k in range(self.N):
-              self.var_c[layer][k,i,j] = self.add_var(CONT,"c_%s-%s_%s_%s" % (layer,i,j,k), bound)
+              self.var_c[layer][k,i,j] = self.add_var(CONT,"c_%s-%s_%s_%s" % (layer,i,j,k), self.bound)
         # Bias only for each output neuron
-        self.biases[layer][j] = self.add_var(INT,"b_%s-%s" % (layer,j), bound)
+        self.biases[layer][j] = self.add_var(INT,"b_%s-%s" % (layer,j), self.bound)
 
         if layer < len(self.architecture) - 1:
           for k in range(self.N):
@@ -75,10 +75,10 @@ class BNN:
             if layer == 1:
               inputs.append(self.train_x[i,k]*self.weights[layer][i,j])
             else:
-              self.add_constraint(self.var_c[layer][k,i,j] - self.weights[layer][i,j] + 2*self.act[lastLayer][k,i] <= 2)
-              self.add_constraint(self.var_c[layer][k,i,j] + self.weights[layer][i,j] - 2*self.act[lastLayer][k,i] <= 0)
-              self.add_constraint(self.var_c[layer][k,i,j] - self.weights[layer][i,j] - 2*self.act[lastLayer][k,i] >= -2)
-              self.add_constraint(self.var_c[layer][k,i,j] + self.weights[layer][i,j] + 2*self.act[lastLayer][k,i] >= 0)
+              self.add_constraint(self.var_c[layer][k,i,j] - self.weights[layer][i,j] + 2*self.bound*self.act[lastLayer][k,i] <= 2*self.bound)
+              self.add_constraint(self.var_c[layer][k,i,j] + self.weights[layer][i,j] - 2*self.bound*self.act[lastLayer][k,i] <= 0*self.bound)
+              self.add_constraint(self.var_c[layer][k,i,j] - self.weights[layer][i,j] - 2*self.bound*self.act[lastLayer][k,i] >= -2*self.bound)
+              self.add_constraint(self.var_c[layer][k,i,j] + self.weights[layer][i,j] + 2*self.bound*self.act[lastLayer][k,i] >= 0*self.bound)
               inputs.append(self.var_c[layer][k,i,j])
           pre_activation = sum(inputs) + self.biases[layer][j]
 
@@ -92,16 +92,6 @@ class BNN:
 
   def calc_objective(self):
     raise NotImplementedError("Calculate objective not implemented")
-
-    #self.add_constraint(self.objSum >= np.floor(self.N*0.05))
-    #self.regularizer = 0
-    #for layer in self.abs_weights:
-    #  self.regularizer += self.abs_weights[layer].sum()
-    #for layer in self.abs_biases:
-    #  self.regularizer += self.abs_biases[layer].sum()
-    #from pdb import set_trace
-    #set_trace()
-    #self.add_constraint(self.regularizer <= (self.architecture[0]-self.sum_dead)*2.5)
 
   def add_var(self, precision, name, bound=0):
     raise NotImplementedError("Add variable not implemented")

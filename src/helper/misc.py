@@ -53,3 +53,8 @@ def calc_accuracy(inferred, y):
       acc += 1
   acc = acc/len(y)
   return acc*100
+
+def clear_print(text):
+  print("====================================")
+  print(text)
+  print("====================================")

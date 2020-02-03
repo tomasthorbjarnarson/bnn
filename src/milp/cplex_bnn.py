@@ -3,14 +3,14 @@ from docplex.mp.progress import SolutionListener
 import numpy as np
 import math
 from helper.misc import inference, calc_accuracy
-from globals import INT, BIN, CONT
+from globals import INT, BIN, CONT, LOG
 
 def get_cplex_bnn(BNN, N, architecture, seed=0):
   # Init a BNN using CPLEX API according to the BNN supplied
   class Cplex_BNN(BNN):
-    def __init__(self, N, architecture, seed=0, log=True):
-      self.log = log
-      model = Model("Cplex_BNN", log_output=log)
+    def __init__(self, N, architecture,seed):
+      self.log = LOG
+      model = Model("Cplex_BNN", log_output=LOG)
       BNN.__init__(self, model, N, architecture, seed)
       
     def add_var(self, precision, name, bound=0):
@@ -26,6 +26,9 @@ def get_cplex_bnn(BNN, N, architecture, seed=0):
     def add_constraint(self, constraint):
       self.m.add_constraint(constraint)
 
+    def set_objective(self):
+      pass
+
     def train(self, time=None, focus=None):
       if time:
         self.m.set_time_limit(time)
@@ -33,8 +36,8 @@ def get_cplex_bnn(BNN, N, architecture, seed=0):
         self.m.context.cplex_parameters.emphasis.mip = focus
       if self.log:
         self.m.print_information()
-      self.m.minimize(self.objSum)
-      listener = MyProgressListener(self.m, self.weights, self.biases, self.val_x, self.val_y, self.architecture)
+      self.m.minimize(self.obj)
+      listener = MyProgressListener(self.m, self.weights, self.biases, self.data["val_x"], self.data["val_y"], self.architecture)
       self.m.add_progress_listener(listener)
       self.sol = self.m.solve()
       if self.log:

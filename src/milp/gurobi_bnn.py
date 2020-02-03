@@ -4,7 +4,7 @@ import numpy as np
 from helper.misc import inference, calc_accuracy
 from globals import INT, BIN, CONT, LOG
 
-def get_gurobi_bnn(BNN, N, architecture, seed):
+def get_gurobi_bnn(BNN, N, architecture, seed=0):
   # Init a BNN using Gurobi API according to the BNN supplied
   class Gurobi_BNN(BNN):
     def __init__(self, N, architecture, seed):
@@ -34,6 +34,7 @@ def get_gurobi_bnn(BNN, N, architecture, seed):
         self.m.setParam('TimeLimit', time)
       if focus:
         self.m.setParam('MIPFocus', focus)
+      #self.m.setParam('Threads', 1)
       self.m._lastobjbst = GRB.INFINITY
       self.m._lastobjbnd = -GRB.INFINITY
       self.m._progress = []
@@ -53,12 +54,7 @@ def get_gurobi_bnn(BNN, N, architecture, seed):
         self.m._progress.append((self.m.NodeCount, self.m.ObjVal, self.m.ObjBound, self.m.Runtime, gap))
 
     def get_objective(self):
-      obj = self.m.getObjective()
-      try:
-        obj = obj.getValue()
-      except:
-        obj = -1
-      return obj
+      return self.m.ObjVal
 
     def get_runtime(self):
       return self.m.Runtime

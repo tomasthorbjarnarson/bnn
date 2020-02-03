@@ -5,7 +5,7 @@ from milp.max_correct_bnn import MAX_CORRECT_BNN
 from milp.min_hinge_bnn import MIN_HINGE_BNN
 from helper.misc import inference, calc_accuracy
 from helper.save_data import DataSaver
-from globals import ARCHITECTURES, set_log
+from globals import ARCHITECTURES
 import argparse
 
 milps = {
@@ -21,12 +21,11 @@ if __name__ == '__main__':
   parser.add_argument('--solver', default="gurobi", type=str)
   parser.add_argument('--arch', default=2, type=int)
   parser.add_argument('--ex', default=3, type=int)
-  parser.add_argument('--focus', default=3, type=int)
+  parser.add_argument('--focus', default=0, type=int)
   parser.add_argument('--time', default=1, type=float)
   parser.add_argument('--seed', default=0, type=int)
   parser.add_argument('--loss', default="min_w", type=str)
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
-  parser.add_argument('--log', action='store_true', help="An optional flag to save data")
   args = parser.parse_args()
   
   solver = args.solver
@@ -36,9 +35,6 @@ if __name__ == '__main__':
   time = args.time
   seed = args.seed
   loss = args.loss
-  log = args.log
-
-  set_log(log)
 
   print(args)
 

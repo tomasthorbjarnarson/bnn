@@ -8,7 +8,7 @@ import pathlib
 import json
 from datetime import datetime
 from globals import ARCHITECTURES
-from helper.misc import inference, calc_accuracy
+from helper.misc import inference, calc_accuracy, clear_print
 from milp.gurobi_bnn import get_gurobi_bnn
 from milp.min_w_bnn import MIN_W_BNN
 from milp.max_correct_bnn import MAX_CORRECT_BNN
@@ -176,11 +176,6 @@ def run_bnn_experiments(loss, experiment, num_experiments):
 
   return bnn_results
 
-
-def clear_print(text):
-  print("====================================")
-  print(text)
-  print("====================================")
 
 def get_acc_mean_std(results):
   mean = [np.mean(z[0]) for z in results]

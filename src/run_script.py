@@ -7,7 +7,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Optional app description')
 
   parser.add_argument('--script', type=str)
-  parser.add_argument('--losses', type=str)
+  parser.add_argument('--losses', default="", type=str)
   parser.add_argument('--save', action='store_true')
   args = parser.parse_args()
   script = args.script

@@ -6,7 +6,7 @@ import math
 import random
 
 def preprocess_mnist(set_x):
-  # Keep this for later
+  # Normalize pixels to be between 0 and 1
   proc_x = set_x/255
   # Use this to simply set to float
   #proc_x = set_x / 1.0

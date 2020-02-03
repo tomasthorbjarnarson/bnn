@@ -10,8 +10,4 @@ CONT = 2
 
 EPSILON = 1
 
-LOG = False
-
-def set_log(log):
-  LOG = log
-
+LOG = True
