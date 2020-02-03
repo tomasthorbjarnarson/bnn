@@ -3,6 +3,7 @@ from milp.gurobi_bnn import get_gurobi_bnn
 from milp.min_w_bnn import MIN_W_BNN
 from milp.max_correct_bnn import MAX_CORRECT_BNN
 from milp.min_hinge_bnn import MIN_HINGE_BNN
+from milp.min_hinge_reg_bnn import MIN_HINGE_REG_BNN
 from helper.misc import inference, calc_accuracy
 from helper.save_data import DataSaver
 from globals import ARCHITECTURES
@@ -11,7 +12,8 @@ import argparse
 milps = {
   "min_w": MIN_W_BNN,
   "max_correct": MAX_CORRECT_BNN,
-  "min_hinge": MIN_HINGE_BNN
+  "min_hinge": MIN_HINGE_BNN,
+  "min_hinge_reg": MIN_HINGE_REG_BNN
 }  
 
 if __name__ == '__main__':
@@ -19,7 +21,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Optional app description')
 
   parser.add_argument('--solver', default="gurobi", type=str)
-  parser.add_argument('--arch', default=2, type=int)
+  parser.add_argument('--arch', default=2, type=str)
   parser.add_argument('--ex', default=3, type=int)
   parser.add_argument('--focus', default=0, type=int)
   parser.add_argument('--time', default=1, type=float)
@@ -29,7 +31,10 @@ if __name__ == '__main__':
   args = parser.parse_args()
   
   solver = args.solver
-  architecture = ARCHITECTURES[args.arch]
+  if "-" in args.arch:
+    architecture = [int(x) for x in args.arch.split("-")]
+  else:
+    architecture = ARCHITECTURES[int(args.arch)]
   numExamples = args.ex
   focus = args.focus
   time = args.time

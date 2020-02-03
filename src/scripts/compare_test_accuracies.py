@@ -13,6 +13,7 @@ from milp.gurobi_bnn import get_gurobi_bnn
 from milp.min_w_bnn import MIN_W_BNN
 from milp.max_correct_bnn import MAX_CORRECT_BNN
 from milp.min_hinge_bnn import MIN_HINGE_BNN
+from milp.min_hinge_reg_bnn import MIN_HINGE_REG_BNN
 
 Icarte_dir = '../Icarte/bnn/src'
 
@@ -32,7 +33,8 @@ seeds = [1,2,3,4,5]
 milps = {
   "min_w": MIN_W_BNN,
   "max_correct": MAX_CORRECT_BNN,
-  "min_hinge": MIN_HINGE_BNN
+  "min_hinge": MIN_HINGE_BNN,
+  "min_hinge_reg": MIN_HINGE_REG_BNN
 }
 
 
