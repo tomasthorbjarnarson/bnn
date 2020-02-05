@@ -8,13 +8,19 @@ from helper.misc import inference, calc_accuracy
 from helper.save_data import DataSaver
 from globals import ARCHITECTURES
 import argparse
+from keras.datasets import mnist,cifar10
 
 milps = {
   "min_w": MIN_W_BNN,
   "max_correct": MAX_CORRECT_BNN,
   "min_hinge": MIN_HINGE_BNN,
   "min_hinge_reg": MIN_HINGE_REG_BNN
-}  
+}
+
+datasets = {
+  "mnist": mnist,
+  "cifar10": cifar10
+}
 
 if __name__ == '__main__':
 
@@ -27,6 +33,7 @@ if __name__ == '__main__':
   parser.add_argument('--time', default=1, type=float)
   parser.add_argument('--seed', default=0, type=int)
   parser.add_argument('--loss', default="min_w", type=str)
+  parser.add_argument('--data', default="mnist", type=str)
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
   args = parser.parse_args()
   
@@ -40,16 +47,20 @@ if __name__ == '__main__':
   time = args.time
   seed = args.seed
   loss = args.loss
+  data = args.data
 
   print(args)
 
   if loss not in milps:
-    raise Exception("MILP model not known")
+    raise Exception("MILP model %s not known" % loss)
+
+  if data not in datasets:
+    raise Exception("Dataset %s not known" % data)
 
   if solver == 'gurobi':
-    bnn = get_gurobi_bnn(milps[loss], numExamples, architecture, seed)
+    bnn = get_gurobi_bnn(milps[loss], datasets[data], numExamples, architecture, seed)
   elif solver =='cplex':
-    bnn = get_cplex_bnn(milps[loss], numExamples, architecture, seed)
+    bnn = get_cplex_bnn(milps[loss], datasets[data], numExamples, architecture, seed)
   else:
     raise Exception("Solver %s not known" % solver)
   bnn.train(time*60, focus)
@@ -59,17 +70,20 @@ if __name__ == '__main__':
 
   varMatrices = bnn.extract_values()
 
+  import time
+  tr_time = time.time()
+
   infer_train = inference(bnn.data["train_x"], varMatrices, bnn.architecture)
+  print("Infer train time: %s" % (time.time() - tr_time))
+  te_time = time.time()
   infer_test = inference(bnn.data["test_x"], varMatrices, bnn.architecture)
+  print("Infer test time: %s" % (time.time() - te_time))
 
   train_acc = calc_accuracy(infer_train, bnn.data["train_y"])
   test_acc = calc_accuracy(infer_test, bnn.data["test_y"])
 
   print("Training accuracy: %s " % (train_acc))
   print("Testing accuracy: %s " % (test_acc))
-
-  #from pdb import set_trace
-  #set_trace()
 
   if args.save:
     if solver == 'gurobi':

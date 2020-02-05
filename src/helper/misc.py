@@ -16,9 +16,8 @@ def inference(set_x, varMatrices, architecture):
 
   for lastLayer, neurons_out in enumerate(architecture[1:]):
     layer = lastLayer + 1
-
-    infer = np.dot(np.transpose(varMatrices["w_%s" % layer]),infer)
-    infer += np.reshape(varMatrices["b_%s" % layer], (neurons_out,1))
+    infer = np.dot(infer,varMatrices["w_%s" % layer])
+    infer += varMatrices["b_%s" % layer]
     if layer < len(architecture) - 1:
       infer = numpy_sign(infer)
 
@@ -28,7 +27,7 @@ def inference(set_x, varMatrices, architecture):
 
 def all_good(infer):
   output = []
-  for row in np.transpose(infer):
+  for row in infer:
     label = np.argwhere(row >= 0)
     if len(label) == 1 and len(label[0]) == 1:
       label = label[0][0]
@@ -40,7 +39,7 @@ def all_good(infer):
 def all_ok(infer):
   random.seed(seed)
   output = []
-  for row in np.transpose(infer):
+  for row in infer:
     label = np.argwhere(row == np.max(row))
     label = random.choice(label)[0]
     output.append(label)

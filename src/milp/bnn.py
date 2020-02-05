@@ -4,15 +4,16 @@ https://bitbucket.org/RToroIcarte/bnn/src/master/
 """
 
 import numpy as np
-from helper.mnist import load_mnist
+from helper.mnist import load_data
 from globals import INT, BIN, CONT, EPSILON
 
 class BNN:
-  def __init__(self, model, N, architecture, seed=0):
+  def __init__(self, model, dataset, N, architecture, seed=0):
 
     self.N = N
     self.architecture = architecture
-    data = load_mnist(N, seed)
+    data = load_data(dataset,N, seed)
+    self.architecture[0] = data['train_x'].shape[1]
     self.data = data
     self.train_x = data["train_x"]
     self.oh_train_y = data["oh_train_y"]
@@ -30,7 +31,7 @@ class BNN:
 
     self.bound = 1
     # All pixels that are 0 in every example are considered dead
-    dead = np.all(self.train_x == 0, axis=1)
+    dead = np.all(self.train_x == 0, axis=0)
 
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
       layer = lastLayer + 1
@@ -73,7 +74,7 @@ class BNN:
           inputs = []
           for i in range(neurons_in):
             if layer == 1:
-              inputs.append(self.train_x[i,k]*self.weights[layer][i,j])
+              inputs.append(self.train_x[k,i]*self.weights[layer][i,j])
             else:
               self.add_constraint(self.var_c[layer][k,i,j] - self.weights[layer][i,j] + 2*self.bound*self.act[lastLayer][k,i] <= 2*self.bound)
               self.add_constraint(self.var_c[layer][k,i,j] + self.weights[layer][i,j] - 2*self.bound*self.act[lastLayer][k,i] <= 0*self.bound)
@@ -88,7 +89,6 @@ class BNN:
 
   def add_output_constraints(self):
     raise NotImplementedError("Add output constraints not implemented")
-    
 
   def calc_objective(self):
     raise NotImplementedError("Calculate objective not implemented")
@@ -116,12 +116,12 @@ class BNN:
 
     varMatrices = {}
     for layer in self.weights:
-      varMatrices["w_%s" %layer] = get_val(self.weights[layer])
-      varMatrices["b_%s" %layer] = get_val(self.biases[layer])
+      varMatrices["w_%s" %layer] = self.get_val(self.weights[layer])
+      varMatrices["b_%s" %layer] = self.get_val(self.biases[layer])
       if layer > 1:
-        varMatrices["c_%s" %layer] = get_val(self.var_c[layer])
+        varMatrices["c_%s" %layer] = self.get_val(self.var_c[layer])
       if layer < len(self.architecture) - 1:
-        varMatrices["act_%s" %layer] = get_val(self.act[layer])
+        varMatrices["act_%s" %layer] = self.get_val(self.act[layer])
 
     return varMatrices
 

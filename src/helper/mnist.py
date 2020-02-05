@@ -16,7 +16,7 @@ def preprocess_mnist(set_x):
 def get_unique_examples(train_x, train_y, N):
   ex_per_class = math.ceil(N / 10)
   indices = []
-  for i, ex in enumerate(np.transpose(train_x)):
+  for i, ex in enumerate(train_x):
     if len(indices) < ex_per_class*10 and np.count_nonzero(train_y[indices] == train_y[i]) < ex_per_class:
       indices.append(i)
 
@@ -74,6 +74,53 @@ def load_mnist(N, seed):
     "test_y": test_y,
     "oh_test_y": oh_test_y,
   }
+
+  return data
+
+def oh_encode(labels):
+  classes = np.max(labels) 
+  encoded = np.zeros((len(labels), classes+1)) - 1
+
+  for i,val in enumerate(labels):
+    encoded[i][val] = 1
+  return encoded
+
+def load_data(dataset, N, seed):
+  random.seed(seed)
+
+  (train_x, train_y), (test_x, test_y) = dataset.load_data()
+  # Normalize
+  train_x = train_x/255
+  test_x = test_x/255
+
+  pixels = np.prod(train_x.shape[1:])
+  train_x = train_x.reshape(-1, pixels)
+  test_x = test_x.reshape(-1, pixels)
+
+  train_indices = [x for x in range(len(train_x))]
+
+  if seed:
+    random.shuffle(train_indices)
+
+  train_x = train_x[train_indices]
+  train_y = train_y[train_indices]
+
+  max_num = len(train_x)
+  train_indices = get_unique_examples(train_x, train_y, N)
+  val_indices = [i for i in range(max_num) if i not in train_indices]
+
+  data = {}
+  data["train_x"] = train_x[train_indices]
+  data["train_y"] = train_y[train_indices]
+  data["oh_train_y"] = oh_encode(train_y[train_indices])
+
+  data["val_x"] = train_x[val_indices]
+  data["val_y"] = train_y[val_indices]
+  data["oh_val_y"] = oh_encode(train_y[val_indices])
+
+  data["test_x"] = test_x
+  data["test_y"] = test_y
+  data["oh_val_y"] = oh_encode(test_y)
 
   return data
 

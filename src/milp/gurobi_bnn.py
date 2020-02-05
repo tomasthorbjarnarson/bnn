@@ -4,14 +4,14 @@ import numpy as np
 from helper.misc import inference, calc_accuracy
 from globals import INT, BIN, CONT, LOG
 
-def get_gurobi_bnn(BNN, N, architecture, seed=0):
+def get_gurobi_bnn(BNN, dataset, N, architecture, seed=0):
   # Init a BNN using Gurobi API according to the BNN supplied
   class Gurobi_BNN(BNN):
-    def __init__(self, N, architecture, seed):
+    def __init__(self, dataset, N, architecture, seed):
       model = gp.Model("Gurobi_BNN")
       if not LOG:
         model.setParam("OutputFlag", 0)
-      BNN.__init__(self, model, N, architecture, seed)
+      BNN.__init__(self, model, dataset, N, architecture, seed)
       
     def add_var(self, precision, name, bound=0):
       if precision == INT:
@@ -40,7 +40,6 @@ def get_gurobi_bnn(BNN, N, architecture, seed=0):
       self.m._progress = []
       self.m._weights = self.weights
       self.m._biases = self.biases
-      #self.m._H = self.H
       self.m._val_x = self.data["val_x"]
       self.m._val_y = self.data["val_y"]
       self.m._architecture = self.architecture
@@ -76,13 +75,15 @@ def get_gurobi_bnn(BNN, N, architecture, seed=0):
       return data
 
     def get_val(self, maybe_var):
-      try:
-        val = maybe_var.x
-      except:
-        val = 0
-      return val
+      tmp = maybe_var.copy()
+      for index, count in np.ndenumerate(maybe_var):
+        try:
+          tmp[index] = maybe_var[index].x
+        except:
+          tmp[index] = 0
+      return tmp
 
-  return Gurobi_BNN(N, architecture, seed,)
+  return Gurobi_BNN(dataset, N, architecture, seed)
 
 
 def mycallback(model, where):
@@ -117,12 +118,6 @@ def mycallback(model, where):
             varMatrices["w_%s" % layer][i,j] = model.cbGetSolution(model._weights[layer][i,j])
       for i in range(b_shape[0]):
         varMatrices["b_%s" % layer][i] = model.cbGetSolution(model._biases[layer][i])
-      #if layer < len(model._architecture) - 1:
-      #  h_shape = model._H[layer].shape
-      #  varMatrices["H_%s" % layer] = np.zeros(h_shape)
-      #  for i in range(h_shape[0]):
-      #    varMatrices["H_%s" % layer][i] = model.cbGetSolution(model._H[layer][i])
-      #  print("# neurons in HL %s: %s" % (layer, varMatrices["H_%s" % layer].sum()))
 
     infer_test = inference(model._val_x, varMatrices, model._architecture)
     val_acc = calc_accuracy(infer_test, model._val_y)

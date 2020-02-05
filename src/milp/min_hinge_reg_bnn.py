@@ -4,9 +4,9 @@ from globals import CONT, BIN
 
 
 class MIN_HINGE_REG_BNN(BNN):
-  def __init__(self, model, N, architecture, seed=0):
+  def __init__(self, model, dataset, N, architecture, seed=0):
 
-    BNN.__init__(self, model, N, architecture, seed)
+    BNN.__init__(self, model, dataset, N, architecture, seed)
 
     self.init_output()
     self.add_output_constraints()
@@ -15,7 +15,7 @@ class MIN_HINGE_REG_BNN(BNN):
 
   def add_regularizer(self):
     self.H = {}
-    dead = np.all(self.train_x == 0, axis=1)
+    dead = np.all(self.train_x == 0, axis=0)
 
     for lastLayer, neurons_out in enumerate(self.architecture[1:-1]):
       layer = lastLayer + 1
@@ -49,13 +49,13 @@ class MIN_HINGE_REG_BNN(BNN):
         inputs = []
         for i in range(neurons_in):
           if layer == 1:
-            inputs.append(self.train_x[i,k]*self.weights[layer][i,j])
+            inputs.append(self.train_x[k,i]*self.weights[layer][i,j])
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]
-        self.add_constraint(self.output[k,j] == pre_activation*self.oh_train_y[j,k])
+        self.add_constraint(self.output[k,j] == pre_activation*self.oh_train_y[k,j])
         # Do we need to normalize to between 0 and 1 ?
-        # self.add_constraint(self.output[k,j] == (pre_activation*self.oh_train_y[j,k])/self.out_bound)
+        # self.add_constraint(self.output[k,j] == (pre_activation*self.oh_train_y[k,j])/self.out_bound)
 
   def calc_objective(self):
     def hinge(u):
@@ -84,10 +84,9 @@ class MIN_HINGE_REG_BNN(BNN):
 
 
   def extract_values(self):
-    get_val = np.vectorize(self.get_val)
     varMatrices = BNN.extract_values(self)
-    varMatrices["output"] = get_val(self.output)
+    varMatrices["output"] = self.get_val(self.output)
     for layer in self.H:
-      varMatrices["H_%s" % layer] = get_val(self.H[layer])
+      varMatrices["H_%s" % layer] = self.get_val(self.H[layer])
 
     return varMatrices

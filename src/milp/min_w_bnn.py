@@ -3,9 +3,9 @@ from milp.bnn import BNN
 from globals import EPSILON, BIN
 
 class MIN_W_BNN(BNN):
-  def __init__(self, model, N, architecture, seed=0):
+  def __init__(self, model, dataset, N, architecture, seed=0):
 
-    BNN.__init__(self, model, N, architecture, seed)
+    BNN.__init__(self, model, dataset, N, architecture, seed)
     self.add_abs_params()
     self.add_output_constraints()
     self.calc_objective()
@@ -14,7 +14,7 @@ class MIN_W_BNN(BNN):
     self.abs_weights = {}
     self.abs_biases = {}
     # All pixels that are 0 in every example are considered dead
-    dead = np.all(self.train_x == 0, axis=1)
+    dead = np.all(self.train_x == 0, axis=0)
 
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
       layer = lastLayer + 1
@@ -48,7 +48,7 @@ class MIN_W_BNN(BNN):
         inputs = []
         for i in range(neurons_in):
           if layer == 1:
-            inputs.append(self.train_x[i,k]*self.weights[layer][i,j])
+            inputs.append(self.train_x[k,i]*self.weights[layer][i,j])
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]

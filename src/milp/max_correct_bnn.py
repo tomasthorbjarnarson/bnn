@@ -3,9 +3,9 @@ from milp.bnn import BNN
 from globals import EPSILON, BIN
 
 class MAX_CORRECT_BNN(BNN):
-  def __init__(self, model, N, architecture, seed=0):
+  def __init__(self, model, dataset, N, architecture, seed=0):
 
-    BNN.__init__(self, model, N, architecture, seed)
+    BNN.__init__(self, model, dataset, N, architecture, seed)
 
     self.init_output()
     self.add_output_constraints()
@@ -29,7 +29,7 @@ class MAX_CORRECT_BNN(BNN):
         inputs = []
         for i in range(neurons_in):
           if layer == 1:
-            inputs.append(self.train_x[i,k]*self.weights[layer][i,j])
+            inputs.append(self.train_x[k,i]*self.weights[layer][i,j])
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]
