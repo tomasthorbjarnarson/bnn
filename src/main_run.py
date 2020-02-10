@@ -4,11 +4,12 @@ from milp.min_w_bnn import MIN_W_BNN
 from milp.max_correct_bnn import MAX_CORRECT_BNN
 from milp.min_hinge_bnn import MIN_HINGE_BNN
 from milp.min_hinge_reg_bnn import MIN_HINGE_REG_BNN
-from helper.misc import inference, calc_accuracy
+from helper.misc import inference, calc_accuracy,clear_print
+from helper.data import load_data
 from helper.save_data import DataSaver
-from globals import ARCHITECTURES
 import argparse
 from keras.datasets import mnist,cifar10
+import time
 
 milps = {
   "min_w": MIN_W_BNN,
@@ -27,27 +28,27 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Optional app description')
 
   parser.add_argument('--solver', default="gurobi", type=str)
-  parser.add_argument('--arch', default=2, type=str)
+  parser.add_argument('--hl', default=16, type=str)
   parser.add_argument('--ex', default=3, type=int)
   parser.add_argument('--focus', default=0, type=int)
   parser.add_argument('--time', default=1, type=float)
   parser.add_argument('--seed', default=0, type=int)
   parser.add_argument('--loss', default="min_w", type=str)
   parser.add_argument('--data', default="mnist", type=str)
+  parser.add_argument('--bound', default=1, type=int)
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
   args = parser.parse_args()
   
   solver = args.solver
-  if "-" in args.arch:
-    architecture = [int(x) for x in args.arch.split("-")]
-  else:
-    architecture = ARCHITECTURES[int(args.arch)]
+  hl = [int(x) for x in args.hl.split("-")]
+
   numExamples = args.ex
   focus = args.focus
-  time = args.time
+  train_time = args.time
   seed = args.seed
   loss = args.loss
   data = args.data
+  bound = args.bound
 
   print(args)
 
@@ -57,20 +58,29 @@ if __name__ == '__main__':
   if data not in datasets:
     raise Exception("Dataset %s not known" % data)
 
+  # Load data (MNIST/CIFAR10)
+  data = load_data(datasets[data], numExamples, seed)
+
+  # Set up NN layers, including input size, hidden layer sizes and output size
+  architecture = [data["train_x"].shape[1]] + hl + [data["oh_train_y"].shape[1]]
+
+  start = time.time()
   if solver == 'gurobi':
-    bnn = get_gurobi_bnn(milps[loss], datasets[data], numExamples, architecture, seed)
+    bnn = get_gurobi_bnn(milps[loss], data, architecture, bound)
   elif solver =='cplex':
-    bnn = get_cplex_bnn(milps[loss], datasets[data], numExamples, architecture, seed)
+    bnn = get_cplex_bnn(milps[loss], data, architecture, bound)
   else:
     raise Exception("Solver %s not known" % solver)
-  bnn.train(time*60, focus)
+  end = time.time()
+  clear_print("Time to init params: %s" % ((end - start)))
+
+  bnn.train(train_time*60, focus)
 
   obj = bnn.get_objective()
   print("Objective value: ", obj)
 
   varMatrices = bnn.extract_values()
 
-  import time
   tr_time = time.time()
 
   infer_train = inference(bnn.data["train_x"], varMatrices, bnn.architecture)
@@ -84,6 +94,13 @@ if __name__ == '__main__':
 
   print("Training accuracy: %s " % (train_acc))
   print("Testing accuracy: %s " % (test_acc))
+
+  w1 = varMatrices['w_1']
+  b1 = varMatrices['b_1']
+  act1 = varMatrices['act_1']
+
+  from pdb import set_trace
+  set_trace()
 
   if args.save:
     if solver == 'gurobi':

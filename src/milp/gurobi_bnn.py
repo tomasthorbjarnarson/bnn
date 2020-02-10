@@ -4,14 +4,14 @@ import numpy as np
 from helper.misc import inference, calc_accuracy
 from globals import INT, BIN, CONT, LOG
 
-def get_gurobi_bnn(BNN, dataset, N, architecture, seed=0):
+def get_gurobi_bnn(BNN, data, architecture, bound):
   # Init a BNN using Gurobi API according to the BNN supplied
   class Gurobi_BNN(BNN):
-    def __init__(self, dataset, N, architecture, seed):
+    def __init__(self, data, architecture, bound):
       model = gp.Model("Gurobi_BNN")
       if not LOG:
         model.setParam("OutputFlag", 0)
-      BNN.__init__(self, model, dataset, N, architecture, seed)
+      BNN.__init__(self, model, data, architecture, bound)
       
     def add_var(self, precision, name, bound=0):
       if precision == INT:
@@ -40,8 +40,7 @@ def get_gurobi_bnn(BNN, dataset, N, architecture, seed=0):
       self.m._progress = []
       self.m._weights = self.weights
       self.m._biases = self.biases
-      self.m._val_x = self.data["val_x"]
-      self.m._val_y = self.data["val_y"]
+      self.m._data = self.data
       self.m._architecture = self.architecture
       self.m._val_acc = 0
       self.m.update()
@@ -75,15 +74,19 @@ def get_gurobi_bnn(BNN, dataset, N, architecture, seed=0):
       return data
 
     def get_val(self, maybe_var):
-      tmp = maybe_var.copy()
+      tmp = np.zeros(maybe_var.shape)
       for index, count in np.ndenumerate(maybe_var):
         try:
-          tmp[index] = maybe_var[index].x
+          # Sometimes solvers have "integer" values like 1.000000019, round it to 1
+          if maybe_var[index].VType == 'I':
+            tmp[index] = round(maybe_var[index].x)
+          else:
+            tmp[index] = maybe_var[index].x
         except:
           tmp[index] = 0
       return tmp
 
-  return Gurobi_BNN(dataset, N, architecture, seed)
+  return Gurobi_BNN(data, architecture, bound)
 
 
 def mycallback(model, where):
@@ -119,10 +122,17 @@ def mycallback(model, where):
       for i in range(b_shape[0]):
         varMatrices["b_%s" % layer][i] = model.cbGetSolution(model._biases[layer][i])
 
-    infer_test = inference(model._val_x, varMatrices, model._architecture)
-    val_acc = calc_accuracy(infer_test, model._val_y)
+    infer_train = inference(model._data['train_x'], varMatrices, model._architecture)
+    infer_val = inference(model._data['val_x'], varMatrices, model._architecture)
+    train_acc = calc_accuracy(infer_train, model._data['train_y'])
+    val_acc = calc_accuracy(infer_val, model._data['val_y'])
     if LOG:
+      print("Train accuracy: %s " % (train_acc))
       print("Validation accuracy: %s " % (val_acc))
 
     model._progress.append((nodecnt, objbst, objbnd, runtime, gap, val_acc))
     model._val_acc = val_acc
+
+    # Maybe remove later
+    if train_acc == 100 and objbst < 1:
+      model.terminate()

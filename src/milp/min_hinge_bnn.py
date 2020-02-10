@@ -2,18 +2,17 @@ import numpy as np
 from milp.bnn import BNN
 from globals import CONT
 
-
 class MIN_HINGE_BNN(BNN):
-  def __init__(self, model, dataset, N, architecture, seed=0):
+  def __init__(self, model, data, architecture, bound):
 
-    BNN.__init__(self, model, dataset, N, architecture, seed)
+    BNN.__init__(self, model, data, architecture, bound)
 
+    self.out_bound = (self.architecture[-2]+1)*self.bound
     self.init_output()
     self.add_output_constraints()
     self.calc_objective()
 
   def init_output(self):
-    self.out_bound = (self.architecture[-2]+1)*self.bound
     self.output = np.full((self.N, self.architecture[-1]), None)
     for k in range(self.N):
       for j in range(self.architecture[-1]):
@@ -34,16 +33,19 @@ class MIN_HINGE_BNN(BNN):
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]
+        # Approximately normalize to between 0 and 1
+        pre_activation = 2*pre_activation/self.out_bound
         self.add_constraint(self.output[k,j] == pre_activation*self.oh_train_y[k,j])
-        # Do we need to normalize to between 0 and 1 ?
-        # self.add_constraint(self.output[k,j] == (pre_activation*self.oh_train_y[k,j])/self.out_bound)
 
   def calc_objective(self):
     def hinge(u):
       return np.square(np.maximum(0, (0.5 - u)))
     npts = 2*self.out_bound+1
-    lb = -self.out_bound
-    ub = self.out_bound
+    #npts = 11
+    #lb = -self.out_bound
+    #ub = self.out_bound
+    lb = -1
+    ub = 1
     ptu = []
     pthinge = []
     for i in range(npts):
@@ -55,7 +57,6 @@ class MIN_HINGE_BNN(BNN):
         self.m.setPWLObj(self.output[k,j], ptu, pthinge)
 
   def extract_values(self):
-    #get_val = np.vectorize(self.get_val)
     varMatrices = BNN.extract_values(self)
     varMatrices["output"] = self.get_val(self.output)
 

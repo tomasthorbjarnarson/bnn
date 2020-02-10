@@ -4,19 +4,18 @@ https://bitbucket.org/RToroIcarte/bnn/src/master/
 """
 
 import numpy as np
-from helper.mnist import load_data
 from globals import INT, BIN, CONT, EPSILON
 
 class BNN:
-  def __init__(self, model, dataset, N, architecture, seed=0):
+  def __init__(self, model, data, architecture, bound):
 
-    self.N = N
+    self.N = len(data["train_x"])
     self.architecture = architecture
-    data = load_data(dataset,N, seed)
-    self.architecture[0] = data['train_x'].shape[1]
     self.data = data
     self.train_x = data["train_x"]
     self.oh_train_y = data["oh_train_y"]
+
+    self.bound = bound
 
     self.m = model
 
@@ -29,7 +28,6 @@ class BNN:
     self.var_c = {}
     self.act = {}
 
-    self.bound = 1
     # All pixels that are 0 in every example are considered dead
     dead = np.all(self.train_x == 0, axis=0)
 
@@ -112,8 +110,6 @@ class BNN:
     raise NotImplementedError("Get value not implemented")
 
   def extract_values(self):
-    get_val = np.vectorize(self.get_val)
-
     varMatrices = {}
     for layer in self.weights:
       varMatrices["w_%s" %layer] = self.get_val(self.weights[layer])
@@ -127,16 +123,14 @@ class BNN:
 
 
   def print_values(self):
-    get_val = np.vectorize(self.get_val)
-
     for layer in self.weights:
       print("Weight %s" % layer)
-      print(get_val(self.weights[layer]))
+      print(self.get_val(self.weights[layer]))
       print("Biases %s" % layer)
-      print(get_val(self.biases[layer]))
+      print(self.get_val(self.biases[layer]))
       if layer > 1:
         print("C %s" % layer)
-        print(get_val(self.var_c[layer]))
+        print(self.get_val(self.var_c[layer]))
       if layer < len(self.architecture) - 1:
         print("Activations %s" % layer)
-        print(get_val(self.act[layer]))
+        print(self.get_val(self.act[layer]))

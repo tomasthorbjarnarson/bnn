@@ -5,13 +5,13 @@ import math
 from helper.misc import inference, calc_accuracy
 from globals import INT, BIN, CONT, LOG
 
-def get_cplex_bnn(BNN, N, architecture, seed=0):
+def get_cplex_bnn(BNN, data, architecture, bound):
   # Init a BNN using CPLEX API according to the BNN supplied
   class Cplex_BNN(BNN):
-    def __init__(self, N, architecture,seed):
+    def __init__(self, data, architecture, bound):
       self.log = LOG
       model = Model("Cplex_BNN", log_output=LOG)
-      BNN.__init__(self, model, N, architecture, seed)
+      BNN.__init__(self, model, data, architecture, bound)
       
     def add_var(self, precision, name, bound=0):
       if precision == INT:
@@ -142,4 +142,4 @@ def get_cplex_bnn(BNN, N, architecture, seed=0):
     def get_progress(self):
       return self.progress
 
-  return Cplex_BNN(N, architecture, seed)
+  return Cplex_BNN(data, architecture, bound)
