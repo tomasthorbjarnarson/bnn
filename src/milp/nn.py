@@ -6,7 +6,7 @@ https://bitbucket.org/RToroIcarte/bnn/src/master/
 import numpy as np
 from globals import INT, BIN, CONT, EPSILON
 
-class BNN:
+class NN:
   def __init__(self, model, data, architecture, bound):
 
     self.N = len(data["train_x"])

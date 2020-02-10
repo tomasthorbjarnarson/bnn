@@ -1,11 +1,11 @@
 import numpy as np
-from milp.bnn import BNN
-from globals import CONT
+from milp.nn import NN
+from globals import EPSILON, BIN
 
-class MIN_HINGE_BNN(BNN):
+class MAX_CORRECT(NN):
   def __init__(self, model, data, architecture, bound):
 
-    BNN.__init__(self, model, data, architecture, bound)
+    NN.__init__(self, model, data, architecture, bound)
 
     self.out_bound = (self.architecture[-2]+1)*self.bound
     self.init_output()
@@ -16,7 +16,8 @@ class MIN_HINGE_BNN(BNN):
     self.output = np.full((self.N, self.architecture[-1]), None)
     for k in range(self.N):
       for j in range(self.architecture[-1]):
-        self.output[k,j] = self.add_var(CONT, bound=self.out_bound, name="output_%s-%s" % (j,k))
+        self.output[k,j] = self.add_var(BIN, name="output_%s-%s" % (j,k))
+      self.add_constraint(self.output[k,:].sum() == 1)
 
   def add_output_constraints(self):
     layer = len(self.architecture) - 1
@@ -33,31 +34,21 @@ class MIN_HINGE_BNN(BNN):
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]
-        # Approximately normalize to between 0 and 1
         pre_activation = 2*pre_activation/self.out_bound
-        self.add_constraint(self.output[k,j] == pre_activation*self.oh_train_y[k,j])
+        self.add_constraint((self.output[k,j] == 1) >> (pre_activation >= 0))
+        self.add_constraint((self.output[k,j] == 0) >> (pre_activation <= -EPSILON*1e10))    
 
   def calc_objective(self):
-    def hinge(u):
-      return np.square(np.maximum(0, (0.5 - u)))
-    npts = 2*self.out_bound+1
-    #npts = 11
-    #lb = -self.out_bound
-    #ub = self.out_bound
-    lb = -1
-    ub = 1
-    ptu = []
-    pthinge = []
-    for i in range(npts):
-      ptu.append(lb + (ub - lb) * i / (npts-1))
-      pthinge.append(hinge(ptu[i]))
-
+    self.obj = self.N
     for k in range(self.N):
       for j in range(self.architecture[-1]):
-        self.m.setPWLObj(self.output[k,j], ptu, pthinge)
+        if self.oh_train_y[k,j] > 0:
+          self.obj -= self.output[k,j]
+
+    self.set_objective()
 
   def extract_values(self):
-    varMatrices = BNN.extract_values(self)
+    varMatrices = NN.extract_values(self)
     varMatrices["output"] = self.get_val(self.output)
 
     return varMatrices

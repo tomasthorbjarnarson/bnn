@@ -1,12 +1,12 @@
 import numpy as np
-from milp.bnn import BNN
+from milp.nn import NN
 from globals import CONT, BIN
 
 
-class MIN_HINGE_REG_BNN(BNN):
+class MIN_HINGE_REG(NN):
   def __init__(self, model, data, architecture):
 
-    BNN.__init__(self, model, data, architecture)
+    NN.__init__(self, model, data, architecture)
 
     self.init_output()
     self.add_output_constraints()
@@ -86,7 +86,7 @@ class MIN_HINGE_REG_BNN(BNN):
 
 
   def extract_values(self):
-    varMatrices = BNN.extract_values(self)
+    varMatrices = NN.extract_values(self)
     varMatrices["output"] = self.get_val(self.output)
     for layer in self.H:
       varMatrices["H_%s" % layer] = self.get_val(self.H[layer])

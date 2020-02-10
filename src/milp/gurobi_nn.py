@@ -4,14 +4,14 @@ import numpy as np
 from helper.misc import inference, calc_accuracy
 from globals import INT, BIN, CONT, LOG
 
-def get_gurobi_bnn(BNN, data, architecture, bound):
-  # Init a BNN using Gurobi API according to the BNN supplied
-  class Gurobi_BNN(BNN):
+def get_gurobi_nn(NN, data, architecture, bound):
+  # Init a NN using Gurobi API according to the NN supplied
+  class Gurobi_NN(NN):
     def __init__(self, data, architecture, bound):
-      model = gp.Model("Gurobi_BNN")
+      model = gp.Model("Gurobi_NN")
       if not LOG:
         model.setParam("OutputFlag", 0)
-      BNN.__init__(self, model, data, architecture, bound)
+      NN.__init__(self, model, data, architecture, bound)
       
     def add_var(self, precision, name, bound=0):
       if precision == INT:
@@ -86,7 +86,7 @@ def get_gurobi_bnn(BNN, data, architecture, bound):
           tmp[index] = 0
       return tmp
 
-  return Gurobi_BNN(data, architecture, bound)
+  return Gurobi_NN(data, architecture, bound)
 
 
 def mycallback(model, where):

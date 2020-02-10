@@ -1,11 +1,11 @@
 import numpy as np
-from milp.bnn import BNN
+from milp.nn import NN
 from globals import EPSILON, BIN
 
-class MIN_W_BNN(BNN):
+class MIN_W(NN):
   def __init__(self, model, dataset, N, architecture, seed=0):
 
-    BNN.__init__(self, model, dataset, N, architecture, seed)
+    NN.__init__(self, model, dataset, N, architecture, seed)
     self.add_abs_params()
     self.add_output_constraints()
     self.calc_objective()

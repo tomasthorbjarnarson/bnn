@@ -9,13 +9,13 @@ import json
 from datetime import datetime
 from globals import ARCHITECTURES
 from helper.misc import inference, calc_accuracy, clear_print
-from milp.gurobi_bnn import get_gurobi_bnn
-from milp.min_w_bnn import MIN_W_BNN
-from milp.max_correct_bnn import MAX_CORRECT_BNN
-from milp.min_hinge_bnn import MIN_HINGE_BNN
-from milp.min_hinge_reg_bnn import MIN_HINGE_REG_BNN
+from milp.gurobi_nn import get_gurobi_nn
+from milp.min_w import MIN_W
+from milp.max_correct import MAX_CORRECT
+from milp.min_hinge import MIN_HINGE
+from milp.min_hinge_reg import MIN_HINGE_REG
 
-Icarte_dir = '../Icarte/bnn/src'
+Icarte_dir = '../Icarte/nn/src'
 
 num_examples = {
   1: [1,2,3,4,5,6,7,8,9,10],
@@ -31,10 +31,10 @@ times = {
 seeds = [1,2,3,4,5]
 
 milps = {
-  "min_w": MIN_W_BNN,
-  "max_correct": MAX_CORRECT_BNN,
-  "min_hinge": MIN_HINGE_BNN,
-  "min_hinge_reg": MIN_HINGE_REG_BNN
+  "min_w": MIN_W,
+  "max_correct": MAX_CORRECT,
+  "min_hinge": MIN_HINGE,
+  "min_hinge_reg": MIN_HINGE_REG
 }
 
 
@@ -66,7 +66,7 @@ def compare_test_accuracies(losses, plot=False):
 
   for loss in losses:
     i += 1
-    print("Running %s BNN experiments!" % loss)
+    print("Running %s nn experiments!" % loss)
     timestr = "%s-%s-%s" % (times[1], times[2], times[3])
     file_name = "%s-Times:%s_S:%s" % (loss, timestr, len(seeds))
     json_path = "%s/%s.json" % (json_dir, file_name)
@@ -81,7 +81,7 @@ def compare_test_accuracies(losses, plot=False):
       continue
 
     if loss in milps:
-      all_results[loss] = run_bnn_experiments(loss, i, num_experiments)
+      all_results[loss] = run_experiments(loss, i, num_experiments)
     elif loss == "gd":
       all_results["gd"] = run_gd_experiments(i, num_experiments)
     else:
@@ -151,11 +151,11 @@ def run_gd_experiments(experiment, num_experiments):
 
   return gd_results
 
-def run_bnn_experiments(loss, experiment, num_experiments):
-  bnn_results = {}
+def run_experiments(loss, experiment, num_experiments):
+  nn_results = {}
   
   for i in ARCHITECTURES:
-    bnn_results[i] = []
+    nn_results[i] = []
     arch = ARCHITECTURES[i]
     for N in num_examples[i]:
       accs = []
@@ -163,20 +163,20 @@ def run_bnn_experiments(loss, experiment, num_experiments):
       clear_print("Max time left: %s" % get_time_left(i, N, experiment, num_experiments))
       for s in seeds:
         clear_print("%s:  Arch: %s, N: %s, Seed: %s" % (loss, arch, N, s))
-        bnn = get_gurobi_bnn(milps[loss],N*10, arch, s)
-        bnn.train(60*times[i], 0)
-        obj = bnn.get_objective()
-        runtime = bnn.get_runtime()
-        varMatrices = bnn.extract_values()
+        nn = get_gurobi_nn(milps[loss],N*10, arch, s)
+        nn.train(60*times[i], 0)
+        obj = nn.get_objective()
+        runtime = nn.get_runtime()
+        varMatrices = nn.extract_values()
 
-        infer_test = inference(bnn.data["test_x"], varMatrices, bnn.architecture)
-        test_acc = calc_accuracy(infer_test, bnn.data["test_y"])
+        infer_test = inference(nn.data["test_x"], varMatrices, nn.architecture)
+        test_acc = calc_accuracy(infer_test, nn.data["test_y"])
         accs.append(test_acc)
         runtimes.append(runtime)
 
-      bnn_results[i].append((accs, runtimes))
+      nn_results[i].append((accs, runtimes))
 
-  return bnn_results
+  return nn_results
 
 
 def get_acc_mean_std(results):

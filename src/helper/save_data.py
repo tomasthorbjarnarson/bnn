@@ -14,12 +14,12 @@ def get_file_locations(architecture, num_examples, solver):
   return plot_dir, json_dir
 
 class DataSaver:
-  def __init__(self, bnn, architecture, num_examples, focus, solver):
-    self.bnn = bnn
+  def __init__(self, nn, architecture, num_examples, focus, solver):
+    self.nn = nn
     self.architecture = architecture
     self.num_examples = num_examples
     self.focus = focus
-    self.time_elapsed = math.floor(bnn.get_runtime())
+    self.time_elapsed = math.floor(nn.get_runtime())
 
     now = datetime.now()
     nowStr = now.strftime("%d %b %H:%M")
@@ -51,7 +51,7 @@ class DataSaver:
     now = datetime.now()
     nowStr = now.strftime("%d/%m/%Y %H:%M:%S")
 
-    data = self.bnn.get_data()
+    data = self.nn.get_data()
 
     data.update({
       'datetime': nowStr,

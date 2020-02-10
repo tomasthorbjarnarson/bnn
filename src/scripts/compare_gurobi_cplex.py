@@ -1,6 +1,6 @@
-from milp.gurobi_bnn import get_gurobi_bnn
-from milp.cplex_bnn import get_cplex_bnn
-from milp.max_correct_bnn import MAX_CORRECT_BNN
+from milp.gurobi_nn import get_gurobi_nn
+from milp.cplex_nn import get_cplex_nn
+from milp.max_correct import MAX_CORRECT
 from helper.misc import clear_print
 from datetime import datetime
 from globals import ARCHITECTURES
@@ -46,17 +46,17 @@ def compare_gurobi_cplex():
       Cplex_results[f] = []
       for N in examples:
         clear_print("Focus: %s. Architecture: %s. # Examples: %s" % (f, arch, N))
-        Gurobi_BNN = get_gurobi_bnn(MAX_CORRECT_BNN, N, arch, seed=10)
-        Cplex_BNN = get_cplex_bnn(MAX_CORRECT_BNN, N, arch, seed=10)
+        Gurobi_NN = get_gurobi_nn(MAX_CORRECT, N, arch, seed=10)
+        Cplex_NN = get_cplex_nn(MAX_CORRECT, N, arch, seed=10)
 
-        Gurobi_BNN.train(60*time, f)
-        Cplex_BNN.train(60*time, f)
+        Gurobi_NN.train(60*time, f)
+        Cplex_NN.train(60*time, f)
 
-        Gurobi_obj = Gurobi_BNN.get_objective()
-        Gurobi_runtime = Gurobi_BNN.get_runtime()
+        Gurobi_obj = Gurobi_NN.get_objective()
+        Gurobi_runtime = Gurobi_NN.get_runtime()
 
-        Cplex_obj = Cplex_BNN.get_objective()
-        Cplex_runtime = Cplex_BNN.get_runtime()
+        Cplex_obj = Cplex_NN.get_objective()
+        Cplex_runtime = Cplex_NN.get_runtime()
 
         Gurobi_results[f].append((Gurobi_obj, Gurobi_runtime))
         print("Gurobi", (Gurobi_obj, Gurobi_runtime))
@@ -77,7 +77,7 @@ def compare_gurobi_cplex():
     plt.legend()
     plt.xlabel("Number of examples")
     plt.ylabel("Runtime [s]")
-    plt.title("Gurobi vs Cplex for max-correct-bnn for %s hidden layers" % (i-1))
+    plt.title("Gurobi vs Cplex for max-correct for %s hidden layers" % (i-1))
     #plt.show()
     plot_dir = "results/plots/compare_gurobi_cplex"
     pathlib.Path(plot_dir).mkdir(exist_ok=True)

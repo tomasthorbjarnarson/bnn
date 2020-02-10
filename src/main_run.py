@@ -1,9 +1,9 @@
-from milp.cplex_bnn import get_cplex_bnn
-from milp.gurobi_bnn import get_gurobi_bnn
-from milp.min_w_bnn import MIN_W_BNN
-from milp.max_correct_bnn import MAX_CORRECT_BNN
-from milp.min_hinge_bnn import MIN_HINGE_BNN
-from milp.min_hinge_reg_bnn import MIN_HINGE_REG_BNN
+from milp.cplex_nn import get_cplex_nn
+from milp.gurobi_nn import get_gurobi_nn
+from milp.min_w import MIN_W
+from milp.max_correct import MAX_CORRECT
+from milp.min_hinge import MIN_HINGE
+from milp.min_hinge_reg import MIN_HINGE_REG
 from helper.misc import inference, calc_accuracy,clear_print
 from helper.data import load_data
 from helper.save_data import DataSaver
@@ -12,10 +12,10 @@ from keras.datasets import mnist,cifar10
 import time
 
 milps = {
-  "min_w": MIN_W_BNN,
-  "max_correct": MAX_CORRECT_BNN,
-  "min_hinge": MIN_HINGE_BNN,
-  "min_hinge_reg": MIN_HINGE_REG_BNN
+  "min_w": MIN_W,
+  "max_correct": MAX_CORRECT,
+  "min_hinge": MIN_HINGE,
+  "min_hinge_reg": MIN_HINGE_REG
 }
 
 datasets = {
@@ -63,34 +63,37 @@ if __name__ == '__main__':
 
   # Set up NN layers, including input size, hidden layer sizes and output size
   architecture = [data["train_x"].shape[1]] + hl + [data["oh_train_y"].shape[1]]
+  print_str = "Architecture: %s. N: %s. Solver: %s. Loss: %s. Bound: %s"
+  clear_print(print_str % ("-".join([str(x) for x in architecture]), len(data["train_x"]), solver, loss, bound))
+
 
   start = time.time()
   if solver == 'gurobi':
-    bnn = get_gurobi_bnn(milps[loss], data, architecture, bound)
+    nn = get_gurobi_nn(milps[loss], data, architecture, bound)
   elif solver =='cplex':
-    bnn = get_cplex_bnn(milps[loss], data, architecture, bound)
+    nn = get_cplex_nn(milps[loss], data, architecture, bound)
   else:
     raise Exception("Solver %s not known" % solver)
   end = time.time()
   clear_print("Time to init params: %s" % ((end - start)))
 
-  bnn.train(train_time*60, focus)
+  nn.train(train_time*60, focus)
 
-  obj = bnn.get_objective()
+  obj = nn.get_objective()
   print("Objective value: ", obj)
 
-  varMatrices = bnn.extract_values()
+  varMatrices = nn.extract_values()
 
   tr_time = time.time()
 
-  infer_train = inference(bnn.data["train_x"], varMatrices, bnn.architecture)
+  infer_train = inference(nn.data["train_x"], varMatrices, nn.architecture)
   print("Infer train time: %s" % (time.time() - tr_time))
   te_time = time.time()
-  infer_test = inference(bnn.data["test_x"], varMatrices, bnn.architecture)
+  infer_test = inference(nn.data["test_x"], varMatrices, nn.architecture)
   print("Infer test time: %s" % (time.time() - te_time))
 
-  train_acc = calc_accuracy(infer_train, bnn.data["train_y"])
-  test_acc = calc_accuracy(infer_test, bnn.data["test_y"])
+  train_acc = calc_accuracy(infer_train, nn.data["train_y"])
+  test_acc = calc_accuracy(infer_test, nn.data["test_y"])
 
   print("Training accuracy: %s " % (train_acc))
   print("Testing accuracy: %s " % (test_acc))
@@ -104,10 +107,10 @@ if __name__ == '__main__':
 
   if args.save:
     if solver == 'gurobi':
-      progress = bnn.m._progress
+      progress = nn.m._progress
     else:
-      progress = bnn.progress
-    DS = DataSaver(bnn, architecture, numExamples, focus, solver)
+      progress = nn.progress
+    DS = DataSaver(nn, architecture, numExamples, focus, solver)
     DS.plot_periodic(progress)
     DS.save_json(train_acc, test_acc)
 
