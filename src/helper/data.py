@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import random
+import copy
 
 def preprocess_mnist(set_x):
   # Normalize pixels to be between 0 and 1
@@ -123,6 +124,19 @@ def load_data(dataset, N, seed):
   data["oh_val_y"] = oh_encode(test_y)
 
   return data
+
+
+def get_batches(data, batch_size):
+  batches = []
+  for i in range(0, len(data["train_x"]), batch_size):
+    tmp_data = copy.deepcopy(data)
+    tmp_data["train_x"] = data["train_x"][i:i+batch_size]
+    tmp_data["train_y"] = data["train_y"][i:i+batch_size]
+    tmp_data["oh_train_y"] = data["oh_train_y"][i:i+batch_size]
+
+    batches.append(tmp_data)
+  
+  return batches
 
 
 def imshow(example):

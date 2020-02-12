@@ -27,6 +27,7 @@ class NN:
     self.biases = {}
     self.var_c = {}
     self.act = {}
+    #self.hl_inputs = {}
 
     # All pixels that are 0 in every example are considered dead
     dead = np.all(self.train_x == 0, axis=0)
@@ -42,6 +43,7 @@ class NN:
         self.var_c[layer] = np.full((self.N, neurons_in, neurons_out), None)
       if layer < len(self.architecture) - 1:
         self.act[layer] = np.full((self.N, neurons_out), None)
+        #self.hl_inputs[layer] = np.full((self.N, neurons_out), None)
 
       for j in range(neurons_out):
         for i in range(neurons_in):
@@ -57,10 +59,12 @@ class NN:
         # Bias only for each output neuron
         self.biases[layer][j] = self.add_var(INT,"b_%s-%s" % (layer,j), self.bound)
 
+        #hl_bound = neurons_in+1
         if layer < len(self.architecture) - 1:
           for k in range(self.N):
             # Each neuron for every example is either activated or not
-            self.act[layer][k,j] = self.add_var(BIN, name="act_%s-%s_%s" % (layer,j,k))
+            self.act[layer][k,j] = self.add_var(BIN, "act_%s-%s_%s" % (layer,j,k))
+            #self.hl_inputs[layer][k,j] = self.add_var(CONT, "hl_%s-%s_%s" % (layer,j,k), hl_bound)
 
   def add_examples(self):
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
@@ -84,6 +88,42 @@ class NN:
           if layer < len(self.architecture) - 1:
             self.add_constraint((self.act[layer][k,j] == 1) >> (pre_activation >= 0))
             self.add_constraint((self.act[layer][k,j] == 0) >> (pre_activation <= -EPSILON))
+            #self.add_constraint(self.hl_inputs[layer][k,j] == pre_activation)
+            #if j > 0:
+            #  self.add_constraint(self.hl_inputs[layer][k,j] <= self.hl_inputs[layer][k,j-1])
+
+  def update_bounds(self, bound_matrix={}):
+    for lastLayer, neurons_out in enumerate(self.architecture[1:]):
+      layer = lastLayer + 1
+      neurons_in = self.architecture[lastLayer]
+
+      for j in range(neurons_out):
+        for i in range(neurons_in):
+          if "w_%s_lb" % layer in bound_matrix and type(self.weights[layer][i,j]) != int:
+            self.weights[layer][i,j].lb = bound_matrix["w_%s_lb" % layer][i,j]
+          if "w_%s_ub" % layer in bound_matrix and type(self.weights[layer][i,j]) != int:
+            self.weights[layer][i,j].ub = bound_matrix["w_%s_ub" % layer][i,j]
+
+        if "b_%s_lb" % layer in bound_matrix:
+          self.biases[layer][j].lb = bound_matrix["b_%s_lb" % layer][j]
+        if "b_%s_ub" % layer in bound_matrix:
+          self.biases[layer][j].ub = bound_matrix["b_%s_ub" % layer][j]
+
+  def warm_start(self, varMatrices):
+    # All pixels that are 0 in every example are considered dead
+    dead = np.all(self.train_x == 0, axis=0)
+
+    for lastLayer, neurons_out in enumerate(self.architecture[1:]):
+      layer = lastLayer + 1
+      neurons_in = self.architecture[lastLayer]
+
+      for j in range(neurons_out):
+        for i in range(neurons_in):
+          if not (layer == 1 and dead[i]):
+            self.weights[layer][i,j].start = varMatrices["w_%s" % layer][i,j]
+        # Bias only for each output neuron
+        self.biases[layer][j].start = varMatrices["b_%s" % layer][j]
+
 
   def add_output_constraints(self):
     raise NotImplementedError("Add output constraints not implemented")
@@ -118,6 +158,7 @@ class NN:
         varMatrices["c_%s" %layer] = self.get_val(self.var_c[layer])
       if layer < len(self.architecture) - 1:
         varMatrices["act_%s" %layer] = self.get_val(self.act[layer])
+        #varMatrices["hl_%s" %layer] = self.get_val(self.hl_inputs[layer])
 
     return varMatrices
 
