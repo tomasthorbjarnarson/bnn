@@ -12,10 +12,10 @@ from milp.min_hinge import MIN_HINGE
 from milp.min_hinge_reg import MIN_HINGE_REG
 
 
-num_examples =list(range(20,220, 20))
+num_examples = [50, 100, 150, 200]
 
 time = 2*60
-seeds = [1,2,3,4,5]
+seeds = [1,2,3]
 hl_neurons = 20
 bound = 1
 
