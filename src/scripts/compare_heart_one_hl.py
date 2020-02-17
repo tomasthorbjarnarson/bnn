@@ -26,7 +26,7 @@ milps = {
   "min_hinge_reg": MIN_HINGE_REG
 }
 
-short = True
+short = False
 if short:
   num_examples = num_examples[0:4]
   seeds = [4,8,12]
