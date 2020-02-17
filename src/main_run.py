@@ -5,7 +5,7 @@ from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.min_hinge_reg import MIN_HINGE_REG
 from helper.misc import inference, calc_accuracy,clear_print
-from helper.data import load_data, get_batches
+from helper.data import load_data, get_batches, load_heart, load_adult
 from helper.save_data import DataSaver
 import argparse
 from keras.datasets import mnist,cifar10
@@ -21,7 +21,9 @@ milps = {
 
 datasets = {
   "mnist": mnist,
-  "cifar10": cifar10
+  "cifar10": cifar10,
+  "heart": None,
+  "adult": None,
 }
 
 solvers = {
@@ -71,18 +73,24 @@ if __name__ == '__main__':
 
 
   # Load data (MNIST/CIFAR10)
-  data = load_data(datasets[data], N, seed)
+  if data == 'heart':
+    data = load_heart(N, seed)
+  elif data == 'adult':
+    data = load_adult(N, seed)
+  else:
+    data = load_data(datasets[data], N, seed)
   batches = [data]
 
   if batch_size > 0 and batch_size < N:
-    if N % batch_size != 0:
-      raise Exception("Batch size should divide N")
     batches = get_batches(data, batch_size)
   else:
     batch_size = N
 
+  in_neurons = [data["train_x"].shape[1]]
+  out_neurons = [data["oh_train_y"].shape[1]]
+
   # Set up NN layers, including input size, hidden layer sizes and output size
-  architecture = [data["train_x"].shape[1]] + hl + [data["oh_train_y"].shape[1]]
+  architecture = in_neurons + hl + out_neurons
   print_str = "Architecture: %s. N: %s. Solver: %s. Loss: %s. Bound: %s"
   clear_print(print_str % ("-".join([str(x) for x in architecture]), len(data["train_x"]), solver, loss, bound))
 

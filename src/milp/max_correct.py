@@ -36,7 +36,7 @@ class MAX_CORRECT(NN):
         pre_activation = sum(inputs) + self.biases[layer][j]
         pre_activation = 2*pre_activation/self.out_bound
         self.add_constraint((self.output[k,j] == 1) >> (pre_activation >= 0))
-        self.add_constraint((self.output[k,j] == 0) >> (pre_activation <= -EPSILON*1e10))    
+        self.add_constraint((self.output[k,j] == 0) >> (pre_activation <= -EPSILON))
 
   def calc_objective(self):
     self.obj = self.N

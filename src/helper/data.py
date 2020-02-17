@@ -2,17 +2,10 @@ from mlxtend.data import loadlocal_mnist
 from mlxtend.preprocessing import one_hot
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import math
 import random
 import copy
-
-def preprocess_mnist(set_x):
-  # Normalize pixels to be between 0 and 1
-  proc_x = set_x/255
-  # Use this to simply set to float
-  #proc_x = set_x / 1.0
-  proc_x = np.transpose(proc_x)
-  return proc_x
 
 def get_unique_examples(train_x, train_y, N):
   ex_per_class = math.ceil(N / 10)
@@ -23,67 +16,21 @@ def get_unique_examples(train_x, train_y, N):
 
   return indices[0:N]
 
-def load_mnist(N, seed):
-
-  random.seed(seed)
-
-  og_train_x, og_train_y = loadlocal_mnist(
-          images_path='data/raw/train-images-idx3-ubyte', 
-          labels_path='data/raw/train-labels-idx1-ubyte')
-
-  test_x, test_y = loadlocal_mnist(
-          images_path='data/raw/t10k-images-idx3-ubyte', 
-          labels_path='data/raw/t10k-labels-idx1-ubyte')
-
-  og_train_indices = [x for x in range(len(og_train_x))]
-  if seed:
-    random.shuffle(og_train_indices)
-
-  og_train_x = og_train_x[og_train_indices]
-  og_train_y = og_train_y[og_train_indices]
-
-  max_num = len(og_train_y)
-
-  og_train_x = preprocess_mnist(og_train_x)
-  # Map labels to 1 and -1 instead of 1 and 0
-  og_oh_train_y = 2*one_hot(og_train_y, num_labels=10)-1
-  og_oh_train_y = np.transpose(og_oh_train_y)
-
-  train_indices = get_unique_examples(og_train_x, og_train_y, N)
-  val_indices = [i for i in range(max_num) if i not in train_indices]
-
-  train_x = og_train_x[:,train_indices]
-  train_y = og_train_y[train_indices]
-  oh_train_y = og_oh_train_y[:,train_indices]
-
-  val_x = og_train_x[:,val_indices]
-  val_y = og_train_y[val_indices]
-  oh_val_y = og_oh_train_y[:,val_indices]
-
-  test_x = preprocess_mnist(test_x)
-  oh_test_y = 2*one_hot(test_y, num_labels=10)-1
-  oh_test_y = np.transpose(oh_test_y)
-
-  data = {
-    "train_x": train_x,
-    "train_y": train_y,
-    "oh_train_y": oh_train_y,
-    "val_x": val_x,
-    "val_y": val_y,
-    "oh_val_y": oh_val_y,
-    "test_x": test_x,
-    "test_y": test_y,
-    "oh_test_y": oh_test_y,
-  }
-
-  return data
+def normalize(matrix, row=False):
+  precision = 3
+  if row:
+    matrix = (matrix - np.min(matrix, axis=0)) / (np.max(matrix, axis=0) - np.min(matrix, axis=0))
+  else:
+    matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
+  matrix = np.around(matrix, decimals=precision)
+  return matrix
 
 def oh_encode(labels):
-  classes = np.max(labels) 
+  classes = int(np.max(labels))
   encoded = np.zeros((len(labels), classes+1)) - 1
 
   for i,val in enumerate(labels):
-    encoded[i][val] = 1
+    encoded[i][int(val)] = 1
   return encoded
 
 def load_data(dataset, N, seed):
@@ -91,8 +38,10 @@ def load_data(dataset, N, seed):
 
   (train_x, train_y), (test_x, test_y) = dataset.load_data()
   # Normalize
-  train_x = train_x/255
-  test_x = test_x/255
+  #train_x = train_x/255
+  #test_x = test_x/255
+  train_x = normalize(train_x)
+  test_x = normalize(test_x)
 
   pixels = np.prod(train_x.shape[1:])
   train_x = train_x.reshape(-1, pixels)
@@ -122,6 +71,113 @@ def load_data(dataset, N, seed):
   data["test_x"] = test_x
   data["test_y"] = test_y
   data["oh_val_y"] = oh_encode(test_y)
+
+  return data
+
+def load_heart(N, seed):
+  random.seed(seed)
+
+  heart = pd.read_csv('data/heart.csv')
+  cp = pd.get_dummies(heart['cp'], prefix='cp')
+  thal = pd.get_dummies(heart['thal'], prefix='thal')
+  slope = pd.get_dummies(heart['slope'], prefix='slope')
+  frames = [heart, cp, thal, slope]
+  heart = pd.concat(frames, axis=1)
+  heart = heart.drop(columns=['cp', 'thal', 'slope'])
+
+  train_size = math.floor(0.8*len(heart))
+
+  heart_y = heart['target'].to_numpy()
+  heart_x = heart.drop(columns=['target']).to_numpy()
+
+  all_indices = [x for x in range(len(heart))]
+  random.shuffle(all_indices)
+  heart_x = heart_x[all_indices]
+  heart_y = heart_y[all_indices]
+  
+  heart_x = normalize(heart_x, True)
+
+  val_size = math.floor(0.1*train_size)
+
+  if N > train_size - val_size:
+    raise Exception("N larger than training sample: %s > %s" % (N, train_size - val_size))
+
+  val_indices = all_indices[0:val_size]
+  train_indices = all_indices[val_size:val_size + N]
+  test_indices = all_indices[train_size:]
+
+  data = {}
+  data["train_x"] = heart_x[train_indices]
+  data["train_y"] = heart_y[train_indices]
+  data["oh_train_y"]= oh_encode(heart_y[train_indices])
+
+  data["val_x"] = heart_x[val_indices]
+  data["val_y"] = heart_y[val_indices]
+  data["oh_val_y"]= oh_encode(heart_y[val_indices])
+
+  data["test_x"] = heart_x[test_indices]
+  data["test_y"] = heart_y[test_indices]
+  data["oh_test_y"]= oh_encode(heart_y[test_indices])
+
+  return data
+
+def load_adult(N, seed):
+  random.seed(seed)
+
+  columns = ['age', 'workclass', 'fnlwgt', 'education', 'education.num', 'marital.status',
+             'occupation', 'relationship', 'race', 'sex', 'capital.gain', 'capital.loss',
+             'hours.per.week', 'native.country', 'income']
+
+  categorical = ['workclass', 'education', 'marital.status', 'occupation', 'relationship',
+                 'race', 'sex', 'native.country']
+
+  adult_train = pd.read_csv('data/adult.data')
+  adult_test = pd.read_csv('data/adult.test')
+  adult_train.columns = columns
+  adult_test.columns = columns
+  train_len = len(adult_train)
+  all_data =  [adult_train, adult_test]
+  all_data = pd.concat(all_data)
+
+  frames = [all_data]
+
+  for cat in categorical:
+    tmp = pd.get_dummies(all_data[cat], prefix=cat)
+    frames.append(tmp)
+
+  all_data = pd.concat(frames, axis=1)
+  all_data = all_data.drop(columns=categorical)
+  all_data['income'] = all_data['income'].map({' <=50K': 0, ' >50K': 1, ' <=50K.': 0, ' >50K.': 1})
+  all_data_y = all_data['income'].to_numpy()
+  all_data_x = all_data.drop(columns=['income']).to_numpy()
+  all_data_x = normalize(all_data_x, True)
+
+  train_x, test_x = all_data_x[:train_len], all_data_x[train_len:]
+  train_y, test_y = all_data_y[:train_len], all_data_y[train_len:]
+
+  train_indices = [x for x in range(train_len)]
+  random.shuffle(train_indices)
+  train_x = train_x[train_indices]
+  train_y = train_y[train_indices]
+
+  train_size = math.floor(0.8*train_len)
+  val_size = len(train_indices) - train_size
+
+  val_indices = train_indices[0:val_size]
+  train_indices = train_indices[val_size:val_size + N]
+
+  data = {}
+  data["train_x"] = train_x[train_indices]
+  data["train_y"] = train_y[train_indices]
+  data["oh_train_y"]= oh_encode(train_y[train_indices])
+
+  data["val_x"] = train_x[val_indices]
+  data["val_y"] = train_y[val_indices]
+  data["oh_val_y"]= oh_encode(train_y[val_indices])
+
+  data["test_x"] = test_x
+  data["test_y"] = test_y
+  data["oh_test_y"]= oh_encode(test_y)
 
   return data
 

@@ -59,7 +59,7 @@ class NN:
         # Bias only for each output neuron
         self.biases[layer][j] = self.add_var(INT,"b_%s-%s" % (layer,j), self.bound)
 
-        #hl_bound = neurons_in+1
+        #hl_bound = (neurons_in+1)*self.bound
         if layer < len(self.architecture) - 1:
           for k in range(self.N):
             # Each neuron for every example is either activated or not

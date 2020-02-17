@@ -33,7 +33,7 @@ class MIN_HINGE(NN):
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]
-        # Approximately normalize to between 0 and 1
+        # Approximately normalize to between -1 and 1
         pre_activation = 2*pre_activation/self.out_bound
         self.add_constraint(self.output[k,j] == pre_activation*self.oh_train_y[k,j])
 

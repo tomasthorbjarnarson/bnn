@@ -4,9 +4,9 @@ from globals import CONT, BIN
 
 
 class MIN_HINGE_REG(NN):
-  def __init__(self, model, data, architecture):
+  def __init__(self, model, data, architecture, bound):
 
-    NN.__init__(self, model, data, architecture)
+    NN.__init__(self, model, data, architecture, bound)
 
     self.init_output()
     self.add_output_constraints()
@@ -72,7 +72,7 @@ class MIN_HINGE_REG(NN):
       pthinge.append(hinge(ptu[i]))
 
     if len(self.architecture) > 2:
-      alpha = 1
+      alpha = 1/sum(self.architecture[1:-1])
       self.obj = 0
       for layer in self.H:
         self.obj += self.H[layer].sum()*alpha

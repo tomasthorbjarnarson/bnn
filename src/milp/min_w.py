@@ -3,9 +3,9 @@ from milp.nn import NN
 from globals import EPSILON, BIN
 
 class MIN_W(NN):
-  def __init__(self, model, dataset, N, architecture, seed=0):
+  def __init__(self, model, data, architecture, bound):
 
-    NN.__init__(self, model, dataset, N, architecture, seed)
+    NN.__init__(self, model, data, architecture, bound)
     self.add_abs_params()
     self.add_output_constraints()
     self.calc_objective()
@@ -52,7 +52,7 @@ class MIN_W(NN):
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]
-        if self.oh_train_y[j,k] > 0:
+        if self.oh_train_y[k,j] > 0:
           self.add_constraint(pre_activation >= 0)
         else:
           self.add_constraint(pre_activation <= -EPSILON)
