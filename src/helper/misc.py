@@ -3,6 +3,11 @@ import random
 
 seed = 0
 
+def infer_and_accuracy(set_x, set_y, varMatrices, architecture):
+  inferred = inference(set_x, varMatrices, architecture)
+  accuracy = calc_accuracy(inferred, set_y)
+  return accuracy
+
 def numpy_sign(varMatrix):
   signVarMatrix = varMatrix
   signVarMatrix[varMatrix >= 0] = 1
@@ -52,6 +57,35 @@ def calc_accuracy(inferred, y):
       acc += 1
   acc = acc/len(y)
   return acc*100
+
+def get_bound_matrix(network_vars, bound):
+  """network_vars contains varMatrices of all batches"""
+  all_vars = {}
+  bound_matrix = {}
+  for key in network_vars[0]:
+    all_vars[key] = np.stack([tmp[key] for tmp in network_vars])
+    if "w_" in key or "b_" in key:
+      tmp_min = np.min(all_vars[key],axis=0)
+      tmp_max = np.max(all_vars[key],axis=0)
+      tmp_min[tmp_min > 0] = -bound
+      tmp_max[tmp_max < 0] = bound
+      bound_matrix["%s_%s" % (key,"lb")] = tmp_min
+      bound_matrix["%s_%s" % (key,"ub")] = tmp_max
+
+  return bound_matrix
+
+def get_mean_vars(network_vars):
+  """network_vars contains varMatrices of all batches"""
+  all_vars = {}
+  mean_vars = {}
+  for key in network_vars[0]:
+    all_vars[key] = np.stack([tmp[key] for tmp in network_vars])
+    mean_vars[key] = np.mean(all_vars[key], axis=0)
+    mean_vars[key][mean_vars[key] < 0] -= 1e-5
+    mean_vars[key][mean_vars[key] >= 0] += 1e-5
+    mean_vars[key] = np.round(mean_vars[key])
+
+  return mean_vars
 
 def clear_print(text):
   print("====================================")

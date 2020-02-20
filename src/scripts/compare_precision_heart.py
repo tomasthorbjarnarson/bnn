@@ -11,13 +11,12 @@ from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.min_hinge_reg import MIN_HINGE_REG
 
-
 num_examples = [50, 100, 150, 200]
+bounds = [1, 3, 7, 15]
 
 time = 2*60
 seeds = [1,2,3]
 hl_neurons = 20
-bound = 1
 
 milps = {
   "min_w": MIN_W,
@@ -26,85 +25,85 @@ milps = {
   "min_hinge_reg": MIN_HINGE_REG
 }
 
-short = False
+short = True
 if short:
-  num_examples = num_examples[0:2]
-  seeds = [4,8]
+  num_examples = [40, 60, 80]
+  bounds = [1,3,7]
+  seeds = [10,20]
   time = 2
 
-def compare_heart_one_hl(losses, plot=False):
+def compare_precision_heart(losses, plot=False):
+  if len(losses) > 1:
+    raise Exception("This experiment is meant for only one loss")
+  loss = losses[0]
 
   all_results = {}
-  num_experiments = len(losses)
 
-  clear_print("Starting script, max time left: %s minutes" % get_time_left(1,1, num_experiments))
+  clear_print("Starting script, max time left: %s minutes" % get_time_left(0,0))
 
-  i = 0
-  json_dir = "results/json/compare_heart_one_hl"
+  json_dir = "results/json/compare_precision_heart"
   pathlib.Path(json_dir).mkdir(exist_ok=True)
+  file_name = "%s-Time:%s-HL_Neurons:%s-Loss:%s-S:%s-Prec:%s" % (loss, time, hl_neurons, loss, len(seeds), len(bounds))
+  json_path = "%s/%s.json" % (json_dir, file_name)
+  if pathlib.Path(json_path).is_file():
+    print("Path %s exists" % json_path)
+    with open(json_path, "r") as f:
+      data = json.loads(f.read())
+      all_results = data["results"]
+  else:
+    i = 0
+    for bound in bounds:
+      print("Running %s nn experiments for bound %s!" % (loss, bound))
+      i += 1
+      all_results[str(bound)] = run_experiments(loss, bound)
 
-  for loss in losses:
-    i += 1
-    print("Running %s nn experiments!" % loss)
-    file_name = "%s-Time:%s-HL_Neurons:%s-Bound:%s-S:%s" % (loss, time, hl_neurons, bound, len(seeds))
-    json_path = "%s/%s.json" % (json_dir, file_name)
-    if pathlib.Path(json_path).is_file():
-      print("Path %s exists" % json_path)
-      with open(json_path, "r") as f:
-        data = json.loads(f.read())
-        all_results[loss] = data["results"]
-      continue
-
-    if loss in milps:
-      all_results[loss] = run_experiments(loss, i, num_experiments)
-    else:
-      print("Loss %s unknown" % loss)
-      continue
     with open(json_path, "w") as f:
-      data = {"results": all_results[loss], "ts": datetime.now().strftime("%d-%m-%H:%M")}
+      data = {"results": all_results, "ts": datetime.now().strftime("%d-%m-%H:%M")}
       json.dump(data, f)
 
   x = num_examples
   plt.figure(1)
-  for loss in losses:
-    y, err = get_acc_mean_std(all_results[loss])
-    plt.errorbar(x, y, yerr=err, capsize=1, label="%s test performance" % loss)
+  for bound in bounds:
+    y, err = get_acc_mean_std(all_results[str(bound)])
+    plt.errorbar(x, y, yerr=err, capsize=1, label="Test performance for precision: %s" % bound)
   plt.legend()
   plt.xlabel("Number of examples")
   plt.ylabel("Test performance %")
-  plt.title("Compare test accuracies for Heart Dataset with bound %s" % bound)
-  plot_dir = "results/plots/compare_heart_one_hl/performance"
+  plt.title("Compare test accuracies for loss %s on Heart Dataset for different precisions" % loss)
+  plot_dir = "results/plots/compare_precision_heart/performance"
   pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
   title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
   if plot:
     plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
   plt.figure(2)
-  for loss in losses:
-    y, err = get_runtime_mean_std(all_results[loss])
-    plt.errorbar(x, y, yerr=err, capsize=1, label="%s runtime" % loss)
+  for bound in bounds:
+    y, err = get_runtime_mean_std(all_results[str(bound)])
+    plt.errorbar(x, y, yerr=err, capsize=1, label="Runtime for precision: %s" % bound)
   plt.legend()
   plt.xlabel("Number of examples")
   plt.ylabel("Runtime [s]")
-  plt.title("Compare runtimes for Heart Dataset with bound %s" % bound)
-  plot_dir = "results/plots/compare_heart_one_hl/runtimes"
+  plt.title("Compare runtimes for loss %s on Heart Dataset for different precisions" % loss)
+  plot_dir = "results/plots/compare_precision_heart/runtimes"
   pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
   if plot:
     plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
-def run_experiments(loss, experiment, num_experiments):
+def run_experiments(loss, bound):
   nn_results = []
   i = 0
   for N in num_examples:
-    i += 1
     accs = []
     runtimes = []
-    clear_print("Max time left: %s" % get_time_left(i, experiment, num_experiments))
+    clear_print("Max time left: %s" % get_time_left(i, bounds.index(bound)))
     for s in seeds:
       data = load_data("heart", N, s)
       arch = get_architecture(data, [hl_neurons])
+      in_neurons = [data["train_x"].shape[1]]
+      out_neurons = [data["oh_train_y"].shape[1]]
+      arch = in_neurons + [hl_neurons] + out_neurons
 
-      clear_print("%s:  HL_Neurons: %s, N: %s, Seed: %s" % (loss, hl_neurons, N, s))
+      clear_print("%s:  HL_Neurons: %s, N: %s, Seed: %s, Bound: %s" % (loss, hl_neurons, N, s, bound))
       nn = get_gurobi_nn(milps[loss], data, arch, bound)
       nn.train(60*time, 0)
       obj = nn.get_objective()
@@ -117,6 +116,7 @@ def run_experiments(loss, experiment, num_experiments):
       runtimes.append(runtime)
 
     nn_results.append((accs, runtimes))
+    i += 1
 
   return nn_results
 
@@ -131,9 +131,9 @@ def get_runtime_mean_std(results):
   std = [np.std(z[1]) for z in results]
   return mean, std
 
-def get_time_left(example, experiment, num_experiments):
-  time_left = len(num_examples[example-1:])*time*len(seeds)
-  time_left += len(num_examples)*time*len(seeds)*(num_experiments - experiment)
+def get_time_left(example, bound_index):
+  time_left = len(num_examples[example:])*time*len(seeds)
+  time_left += len(num_examples)*time*len(seeds)*(len(bounds) - bound_index - 1)
 
   days = time_left // (60*24)
   time_left -= days*60*24

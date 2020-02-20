@@ -1,6 +1,7 @@
 from scripts.compare_gurobi_cplex import compare_gurobi_cplex
 from scripts.compare_test_accuracies import compare_test_accuracies
 from scripts.compare_heart_one_hl import compare_heart_one_hl
+from scripts.compare_precision_heart import compare_precision_heart
 from time import time
 import argparse
 
@@ -23,6 +24,8 @@ if __name__ == '__main__':
     compare_test_accuracies(losses, save)
   elif script == 'compare_heart_one_hl':
     compare_heart_one_hl(losses, save)
+  elif script =='compare_precision_heart':
+    compare_precision_heart(losses, save)
   else:
     raise Exception("Script %s not known" % script)
   end = time()

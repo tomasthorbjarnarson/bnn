@@ -1,13 +1,14 @@
-from mlxtend.data import loadlocal_mnist
-from mlxtend.preprocessing import one_hot
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import math
 import random
 import copy
+from keras.datasets import mnist,cifar10
+from globals import EPSILON
 
 def get_unique_examples(train_x, train_y, N):
+  # When working with minimal data, get as representative examples as possible
   ex_per_class = math.ceil(N / 10)
   indices = []
   for i, ex in enumerate(train_x):
@@ -17,11 +18,15 @@ def get_unique_examples(train_x, train_y, N):
   return indices[0:N]
 
 def normalize(matrix, row=False):
-  precision = 3
+  # Have one less precision than global minimum comparison
+  precision = int(np.log10(EPSILON)+1)*-1
   if row:
+    # Normalize each column
     matrix = (matrix - np.min(matrix, axis=0)) / (np.max(matrix, axis=0) - np.min(matrix, axis=0))
   else:
+    # Normalize every element in matrix
     matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
+  # Round to precision so sign calculations are easier
   matrix = np.around(matrix, decimals=precision)
   return matrix
 
@@ -33,13 +38,45 @@ def oh_encode(labels):
     encoded[i][int(val)] = 1
   return encoded
 
+def get_architecture(data, hls):
+  """data is dict with train/test/val data. hls is list of size of hidden layers"""
+  in_neurons = [data["train_x"].shape[1]]
+  out_neurons = [data["oh_train_y"].shape[1]]
+
+  return in_neurons + hls + out_neurons
+
+def get_batches(data, batch_size):
+  batches = []
+  for i in range(0, len(data["train_x"]), batch_size):
+    tmp_data = copy.deepcopy(data)
+    tmp_data["train_x"] = data["train_x"][i:i+batch_size]
+    tmp_data["train_y"] = data["train_y"][i:i+batch_size]
+    tmp_data["oh_train_y"] = data["oh_train_y"][i:i+batch_size]
+
+    batches.append(tmp_data)
+  
+  return batches
+
 def load_data(dataset, N, seed):
+  """Return list of batches of dataset. If batch_size == 0 : all N elements are in first batch"""
   random.seed(seed)
+  if dataset == "mnist":
+    data = load_keras(mnist, N)
+  elif dataset == "cifar":
+    data = load_keras(cifar10, N)
+  elif dataset == "adult":
+    data = load_adult(N)
+  elif dataset == "heart":
+    data = load_heart(N)
+  else:
+    raise Exception("Dataset %s not known" % dataset)
+
+  return data
+
+def load_keras(dataset, N):
 
   (train_x, train_y), (test_x, test_y) = dataset.load_data()
-  # Normalize
-  #train_x = train_x/255
-  #test_x = test_x/255
+  
   train_x = normalize(train_x)
   test_x = normalize(test_x)
 
@@ -48,9 +85,6 @@ def load_data(dataset, N, seed):
   test_x = test_x.reshape(-1, pixels)
 
   train_indices = [x for x in range(len(train_x))]
-
-  if seed:
-    random.shuffle(train_indices)
 
   train_x = train_x[train_indices]
   train_y = train_y[train_indices]
@@ -74,8 +108,7 @@ def load_data(dataset, N, seed):
 
   return data
 
-def load_heart(N, seed):
-  random.seed(seed)
+def load_heart(N):
 
   heart = pd.read_csv('data/heart.csv')
   cp = pd.get_dummies(heart['cp'], prefix='cp')
@@ -121,8 +154,7 @@ def load_heart(N, seed):
 
   return data
 
-def load_adult(N, seed):
-  random.seed(seed)
+def load_adult(N):
 
   columns = ['age', 'workclass', 'fnlwgt', 'education', 'education.num', 'marital.status',
              'occupation', 'relationship', 'race', 'sex', 'capital.gain', 'capital.loss',
@@ -180,20 +212,6 @@ def load_adult(N, seed):
   data["oh_test_y"]= oh_encode(test_y)
 
   return data
-
-
-def get_batches(data, batch_size):
-  batches = []
-  for i in range(0, len(data["train_x"]), batch_size):
-    tmp_data = copy.deepcopy(data)
-    tmp_data["train_x"] = data["train_x"][i:i+batch_size]
-    tmp_data["train_y"] = data["train_y"][i:i+batch_size]
-    tmp_data["oh_train_y"] = data["oh_train_y"][i:i+batch_size]
-
-    batches.append(tmp_data)
-  
-  return batches
-
 
 def imshow(example):
   plt.imshow(example.reshape([28, 28]))

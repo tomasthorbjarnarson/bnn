@@ -78,7 +78,7 @@ def get_gurobi_nn(NN, data, architecture, bound):
       for index, count in np.ndenumerate(maybe_var):
         try:
           # Sometimes solvers have "integer" values like 1.000000019, round it to 1
-          if maybe_var[index].VType == 'I':
+          if maybe_var[index].VType in ['I', 'B']:
             tmp[index] = round(maybe_var[index].x)
           else:
             tmp[index] = maybe_var[index].x

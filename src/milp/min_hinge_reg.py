@@ -76,7 +76,7 @@ class MIN_HINGE_REG(NN):
       self.obj = 0
       for layer in self.H:
         self.obj += self.H[layer].sum()*alpha
-      self.add_constraint(self.obj >= 10*alpha)
+      self.add_constraint(self.obj >= alpha*self.data['oh_train_y'].shape[1])
 
       self.set_objective()
 

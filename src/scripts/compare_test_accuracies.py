@@ -9,13 +9,14 @@ import json
 from datetime import datetime
 from globals import ARCHITECTURES
 from helper.misc import inference, calc_accuracy, clear_print
+from helper.data import load_data
 from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.min_hinge_reg import MIN_HINGE_REG
 
-Icarte_dir = '../Icarte/nn/src'
+Icarte_dir = '../Icarte/bnn/src'
 
 num_examples = {
   1: [1,2,3,4,5,6,7,8,9,10],
@@ -25,10 +26,10 @@ num_examples = {
 
 times = {
   1: 15,
-  2: 60,
-  3: 60
+  2: 90,
+  3: 90
 }
-seeds = [1,2,3,4,5]
+seeds = [1,2,3]
 
 milps = {
   "min_w": MIN_W,
@@ -38,7 +39,7 @@ milps = {
 }
 
 
-short = False
+short = True
 if short:
   num_examples = {
     1: [1,2,3],
@@ -101,9 +102,9 @@ def compare_test_accuracies(losses, plot=False):
     plt.xlabel("Number of examples")
     plt.ylabel("Test performance %")
     plt.title("Compare test accuracies")
-    plot_dir = "results/plots/compare_test_accuracies"
-    pathlib.Path(plot_dir).mkdir(exist_ok=True)
-    title = "#HL:%s-Time:%s-S:%s_TS:%s" % (i-1, times[i], len(seeds), datetime.now().strftime("%d-%m-%H:%M"))
+    plot_dir = "results/plots/compare_test_accuracies/%s" % datetime.now().strftime("%d-%m-%H:%M")
+    pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
+    title = "#HL:%s-Time:%s-S:%s" % (i-1, times[i], len(seeds))
     if plot:
       plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
@@ -112,14 +113,14 @@ def compare_test_accuracies(losses, plot=False):
     plt.figure(i*10)
     for loss in losses:
       y, err = get_runtime_mean_std(all_results[loss][i])
-      plt.errorbar(x, y, yerr=err, capsize=1, label="%s test performance" % loss)
+      plt.errorbar(x, y, yerr=err, capsize=1, label="%s runtime" % loss)
     plt.legend()
     plt.xlabel("Number of examples")
     plt.ylabel("Runtime [s]")
     plt.title("Compare runtimes")
-    plot_dir = "results/plots/compare_loss_runtimes"
-    pathlib.Path(plot_dir).mkdir(exist_ok=True)
-    title = "#HL:%s-Time:%s-S:%s_TS:%s" % (i-1, times[i], len(seeds), datetime.now().strftime("%d-%m-%H:%M"))
+    plot_dir = "results/plots/compare_loss_runtimes/%s" % datetime.now().strftime("%d-%m-%H:%M")
+    pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
+    title = "#HL:%s-Time:%s-S:%s" % (i-1, times[i], len(seeds))
     if plot:
       plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
@@ -162,8 +163,9 @@ def run_experiments(loss, experiment, num_experiments):
       runtimes = []
       clear_print("Max time left: %s" % get_time_left(i, N, experiment, num_experiments))
       for s in seeds:
-        clear_print("%s:  Arch: %s, N: %s, Seed: %s" % (loss, arch, N, s))
-        nn = get_gurobi_nn(milps[loss],N*10, arch, s)
+        data = load_data("mnist", N*10, s)
+        clear_print("%s:  Arch: %s, N: %s, Seed: %s" % (loss, arch, N*10, s))
+        nn = get_gurobi_nn(milps[loss],data, arch, 1)
         nn.train(60*times[i], 0)
         obj = nn.get_objective()
         runtime = nn.get_runtime()
