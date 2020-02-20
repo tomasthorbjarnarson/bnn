@@ -39,7 +39,7 @@ milps = {
 }
 
 
-short = True
+short = False
 if short:
   num_examples = {
     1: [1,2,3],

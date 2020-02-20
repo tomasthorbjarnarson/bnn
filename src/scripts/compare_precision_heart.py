@@ -25,7 +25,7 @@ milps = {
   "min_hinge_reg": MIN_HINGE_REG
 }
 
-short = True
+short = False
 if short:
   num_examples = [40, 60, 80]
   bounds = [1,3,7]
