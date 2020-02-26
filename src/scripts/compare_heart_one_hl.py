@@ -16,7 +16,7 @@ num_examples = [50, 100, 150, 200]
 
 time = 2*60
 seeds = [1,2,3]
-hl_neurons = 20
+hl_neurons = 16
 bound = 1
 focus = 1
 

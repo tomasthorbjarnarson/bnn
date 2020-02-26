@@ -16,7 +16,7 @@ bounds = [1, 3, 7, 15]
 
 time = 2*60
 seeds = [1,2,3]
-hl_neurons = 20
+hl_neurons = 16
 focus = 1
 
 milps = {
