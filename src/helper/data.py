@@ -85,6 +85,7 @@ def load_keras(dataset, N):
   test_x = test_x.reshape(-1, pixels)
 
   train_indices = [x for x in range(len(train_x))]
+  random.shuffle(train_indices)
 
   train_x = train_x[train_indices]
   train_y = train_y[train_indices]

@@ -18,6 +18,7 @@ time = 2*60
 seeds = [1,2,3]
 hl_neurons = 20
 bound = 1
+focus = 1
 
 milps = {
   "min_w": MIN_W,
@@ -68,7 +69,7 @@ def compare_heart_one_hl(losses, plot=False):
   plt.figure(1)
   for loss in losses:
     y, err = get_acc_mean_std(all_results[loss])
-    plt.errorbar(x, y, yerr=err, capsize=1, label="%s test performance" % loss)
+    plt.errorbar(x, y, yerr=err, capsize=3, label="%s test performance" % loss)
   plt.legend()
   plt.xlabel("Number of examples")
   plt.ylabel("Test performance %")
@@ -82,7 +83,7 @@ def compare_heart_one_hl(losses, plot=False):
   plt.figure(2)
   for loss in losses:
     y, err = get_runtime_mean_std(all_results[loss])
-    plt.errorbar(x, y, yerr=err, capsize=1, label="%s runtime" % loss)
+    plt.errorbar(x, y, yerr=err, capsize=3, label="%s runtime" % loss)
   plt.legend()
   plt.xlabel("Number of examples")
   plt.ylabel("Runtime [s]")
@@ -106,7 +107,7 @@ def run_experiments(loss, experiment, num_experiments):
 
       clear_print("%s:  HL_Neurons: %s, N: %s, Seed: %s" % (loss, hl_neurons, N, s))
       nn = get_gurobi_nn(milps[loss], data, arch, bound)
-      nn.train(60*time, 0)
+      nn.train(60*time, focus)
       obj = nn.get_objective()
       runtime = nn.get_runtime()
       varMatrices = nn.extract_values()

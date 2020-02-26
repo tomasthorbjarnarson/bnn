@@ -97,7 +97,7 @@ def compare_test_accuracies(losses, plot=False):
     plt.figure(i)
     for loss in losses:
       y, err = get_acc_mean_std(all_results[loss][i])
-      plt.errorbar(x, y, yerr=err, capsize=1, label="%s test performance" % loss)
+      plt.errorbar(x, y, yerr=err, capsize=3, label="%s test performance" % loss)
     plt.legend()
     plt.xlabel("Number of examples")
     plt.ylabel("Test performance %")
@@ -113,7 +113,7 @@ def compare_test_accuracies(losses, plot=False):
     plt.figure(i*10)
     for loss in losses:
       y, err = get_runtime_mean_std(all_results[loss][i])
-      plt.errorbar(x, y, yerr=err, capsize=1, label="%s runtime" % loss)
+      plt.errorbar(x, y, yerr=err, capsize=3, label="%s runtime" % loss)
     plt.legend()
     plt.xlabel("Number of examples")
     plt.ylabel("Runtime [s]")
