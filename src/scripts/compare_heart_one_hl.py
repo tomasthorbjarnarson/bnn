@@ -15,7 +15,7 @@ from milp.min_hinge_reg import MIN_HINGE_REG
 num_examples = [50, 100, 150, 200]
 
 time = 2*60
-seeds = [1,2,3]
+seeds = [959323,23421,46262544]
 hl_neurons = 16
 bound = 1
 focus = 1

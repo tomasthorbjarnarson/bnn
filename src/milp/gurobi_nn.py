@@ -134,5 +134,5 @@ def mycallback(model, where):
     model._val_acc = val_acc
 
     # Maybe remove later
-    if train_acc == 100 and objbst < 1:
+    if train_acc == 100 and objbst - objbnd < 1:
       model.terminate()

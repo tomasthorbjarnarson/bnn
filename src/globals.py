@@ -8,6 +8,6 @@ INT = 0
 BIN = 1
 CONT = 2
 
-EPSILON = 1e-4
+EPSILON = 1e-5
 
 LOG = False

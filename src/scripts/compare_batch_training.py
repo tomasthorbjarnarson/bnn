@@ -17,7 +17,7 @@ time = 2*60
 seeds = [13, 37, 1111]
 hl_neurons = 16
 batch_size = 25
-bound = 3
+bound = 1
 focus = 1
 
 milps = {

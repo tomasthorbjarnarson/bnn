@@ -19,7 +19,7 @@ def get_unique_examples(train_x, train_y, N):
 
 def normalize(matrix, row=False):
   # Have one less precision than global minimum comparison
-  precision = int(np.log10(EPSILON)+1)*-1
+  precision = int(np.log10(EPSILON))*-1
   if row:
     # Normalize each column
     matrix = (matrix - np.min(matrix, axis=0)) / (np.max(matrix, axis=0) - np.min(matrix, axis=0))
