@@ -9,12 +9,12 @@ from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
-from milp.min_hinge_reg import MIN_HINGE_REG
+from milp.max_margin import MAX_MARGIN
 
 
 num_examples = [50, 100, 150, 200]
 
-time = 2*60
+time = 5*60
 seeds = [959323,23421,46262544]
 hl_neurons = 16
 bound = 1
@@ -24,14 +24,19 @@ milps = {
   "min_w": MIN_W,
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
-  "min_hinge_reg": MIN_HINGE_REG
+  "max_margin": MAX_MARGIN
 }
+
+max_data = False
+if max_data:
+  num_examples = [200]
+  time = 5*60
 
 short = False
 if short:
-  num_examples = num_examples[0:2]
+  num_examples = num_examples[0:3]
   seeds = [4,8]
-  time = 2
+  time = 5
 
 def compare_heart_one_hl(losses, plot=False):
 
@@ -76,6 +81,7 @@ def compare_heart_one_hl(losses, plot=False):
   plt.title("Compare test accuracies for Heart Dataset with bound %s" % bound)
   plot_dir = "results/plots/compare_heart_one_hl/performance"
   pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
+  file_name = "Time:%s-HL_Neurons:%s-Bound:%s-S:%s" % (time, hl_neurons, bound, len(seeds))
   title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
   if plot:
     plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')

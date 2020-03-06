@@ -3,8 +3,8 @@ from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
-from milp.min_hinge_reg import MIN_HINGE_REG
-from helper.misc import inference, calc_accuracy, infer_and_accuracy, clear_print, get_bound_matrix,get_mean_vars
+from milp.max_margin import MAX_MARGIN
+from helper.misc import infer_and_accuracy, clear_print, get_bound_matrix,get_alt_bound_matrix,get_mean_vars
 from helper.data import load_data, get_batches, get_architecture
 from helper.save_data import DataSaver
 import argparse
@@ -15,7 +15,7 @@ milps = {
   "min_w": MIN_W,
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
-  "min_hinge_reg": MIN_HINGE_REG
+  "max_margin": MAX_MARGIN
 }
 
 solvers = {
@@ -37,6 +37,7 @@ if __name__ == '__main__':
   parser.add_argument('--data', default="mnist", type=str)
   parser.add_argument('--bound', default=1, type=int)
   parser.add_argument('--batch', default=0, type=int)
+  parser.add_argument('--reg', action='store_true', help="An optional flag to regularize network")
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
   parser.add_argument('--all', action='store_true', help="An optional flag to run on all data")
   parser.add_argument('--mean', action='store_true', help="An optional flag to use mean variables")
@@ -53,6 +54,7 @@ if __name__ == '__main__':
   data = args.data
   bound = args.bound
   batch_size = args.batch
+  reg = args.reg
 
   print(args)
 
@@ -82,7 +84,7 @@ if __name__ == '__main__':
   batch_num = 0
   for batch in batches:
     clear_print("Batch: %s. Examples: %s-%s" % (batch_num, batch_num*batch_size, (batch_num+1)*batch_size))
-    nn = get_nn(milps[loss], batch, architecture, bound)
+    nn = get_nn(milps[loss], batch, architecture, bound, reg)
     nn.train(train_time*60, focus)
 
     obj = nn.get_objective()
@@ -106,6 +108,7 @@ if __name__ == '__main__':
   if batch_size > 0 and batch_size != N:
     clear_print("Using warm start from batches")
     bound_matrix = get_bound_matrix(network_vars, bound)
+    #bound_matrix = get_alt_bound_matrix(network_vars, bound)
 
     warm_nn = get_nn(milps[loss], data, architecture, bound)
     #warm_nn.warm_start(get_mean_vars(network_vars))
@@ -161,6 +164,12 @@ if __name__ == '__main__':
   b1 = varMatrices['b_1']
   act1 = varMatrices['act_1']
   train = nn.data['train_x']
+
+  tmp_inf = np.dot(train, w1) + b1
+  tmp_inf[tmp_inf >= 0] = 1
+  tmp_inf[tmp_inf < 0] = -1
+  inf = np.dot(tmp_inf, varMatrices['w_2']) + varMatrices['b_2']
+  norm = 2*inf / ((hls[0]+1)*bound)
   set_trace()
 
   if args.save:

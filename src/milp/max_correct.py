@@ -1,16 +1,17 @@
 import numpy as np
 from milp.nn import NN
-from globals import EPSILON, BIN
+from globals import EPSILON, BIN, TARGET_ERROR
 
 class MAX_CORRECT(NN):
-  def __init__(self, model, data, architecture, bound):
+  def __init__(self, model, data, architecture, bound, reg):
 
-    NN.__init__(self, model, data, architecture, bound)
+    NN.__init__(self, model, data, architecture, bound, reg)
 
     self.out_bound = (self.architecture[-2]+1)*self.bound
     self.init_output()
     self.add_output_constraints()
     self.calc_objective()
+    self.cutoff = np.prod(self.output.shape)*TARGET_ERROR
 
   def init_output(self):
     self.output = np.full((self.N, self.architecture[-1]), None)
@@ -47,8 +48,12 @@ class MAX_CORRECT(NN):
 
     self.set_objective()
 
-  def extract_values(self):
-    varMatrices = NN.extract_values(self)
-    varMatrices["output"] = self.get_val(self.output)
+  def extract_values(self, get_func=lambda z: z.x):
+    varMatrices = NN.extract_values(self, get_func)
+    varMatrices["output"] = self.get_val(self.output, get_func)
+
+    if self.reg:
+      for layer in self.H:
+        varMatrices["H_%s" % layer] = self.get_val(self.H[layer], get_func)
 
     return varMatrices

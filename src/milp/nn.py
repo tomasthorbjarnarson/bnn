@@ -7,7 +7,7 @@ import numpy as np
 from globals import INT, BIN, CONT, EPSILON
 
 class NN:
-  def __init__(self, model, data, architecture, bound):
+  def __init__(self, model, data, architecture, bound, reg):
 
     self.N = len(data["train_x"])
     self.architecture = architecture
@@ -16,6 +16,7 @@ class NN:
     self.oh_train_y = data["oh_train_y"]
 
     self.bound = bound
+    self.reg = reg
 
     self.m = model
 
@@ -27,10 +28,9 @@ class NN:
     self.biases = {}
     self.var_c = {}
     self.act = {}
-    #self.hl_inputs = {}
 
     # All pixels that are 0 in every example are considered dead
-    dead = np.all(self.train_x == 0, axis=0)
+    self.dead = np.all(self.train_x == 0, axis=0)
 
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
       layer = lastLayer + 1
@@ -43,11 +43,10 @@ class NN:
         self.var_c[layer] = np.full((self.N, neurons_in, neurons_out), None)
       if layer < len(self.architecture) - 1:
         self.act[layer] = np.full((self.N, neurons_out), None)
-        #self.hl_inputs[layer] = np.full((self.N, neurons_out), None)
 
       for j in range(neurons_out):
         for i in range(neurons_in):
-          if layer == 1 and dead[i]:
+          if layer == 1 and self.dead[i]:
             # Dead inputs should have 0 weight
             self.weights[layer][i,j] = 0
           else:
@@ -59,12 +58,10 @@ class NN:
         # Bias only for each output neuron
         self.biases[layer][j] = self.add_var(INT,"b_%s-%s" % (layer,j), self.bound)
 
-        #hl_bound = (neurons_in+1)*self.bound
         if layer < len(self.architecture) - 1:
           for k in range(self.N):
             # Each neuron for every example is either activated or not
             self.act[layer][k,j] = self.add_var(BIN, "act_%s-%s_%s" % (layer,j,k))
-            #self.hl_inputs[layer][k,j] = self.add_var(CONT, "hl_%s-%s_%s" % (layer,j,k), hl_bound)
 
   def add_examples(self):
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
@@ -88,9 +85,23 @@ class NN:
           if layer < len(self.architecture) - 1:
             self.add_constraint((self.act[layer][k,j] == 1) >> (pre_activation >= 0))
             self.add_constraint((self.act[layer][k,j] == 0) >> (pre_activation <= -EPSILON))
-            #self.add_constraint(self.hl_inputs[layer][k,j] == pre_activation)
-            #if j > 0:
-            #  self.add_constraint(self.hl_inputs[layer][k,j] <= self.hl_inputs[layer][k,j-1])
+
+  def add_regularizer(self):
+    self.H = {}
+
+    for lastLayer, neurons_out in enumerate(self.architecture[1:-1]):
+      layer = lastLayer + 1
+      neurons_in = self.architecture[lastLayer]
+
+      self.H[layer] = np.full(neurons_out, None)
+      for j in range(neurons_out):
+        self.H[layer][j] = self.add_var(BIN, "h_%s-%s" % (layer,j))
+        for i in range(neurons_in):
+          if not (layer == 1 and self.dead[i]):
+            self.add_constraint((self.H[layer][j] == 0) >> (self.weights[layer][i,j] == 0))
+        self.add_constraint((self.H[layer][j] == 0) >> (self.biases[layer][j] == 0))
+        for n in range(self.architecture[layer+1]):
+          self.add_constraint((self.H[layer][j] == 0) >> (self.weights[layer+1][j,n] == 0))
 
   def update_bounds(self, bound_matrix={}):
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
@@ -149,16 +160,15 @@ class NN:
   def get_val(self, maybe_var):
     raise NotImplementedError("Get value not implemented")
 
-  def extract_values(self):
+  def extract_values(self, get_func=lambda z: z.x):
     varMatrices = {}
     for layer in self.weights:
-      varMatrices["w_%s" %layer] = self.get_val(self.weights[layer])
-      varMatrices["b_%s" %layer] = self.get_val(self.biases[layer])
+      varMatrices["w_%s" %layer] = self.get_val(self.weights[layer], get_func)
+      varMatrices["b_%s" %layer] = self.get_val(self.biases[layer], get_func)
       if layer > 1:
-        varMatrices["c_%s" %layer] = self.get_val(self.var_c[layer])
+        varMatrices["c_%s" %layer] = self.get_val(self.var_c[layer], get_func)
       if layer < len(self.architecture) - 1:
-        varMatrices["act_%s" %layer] = self.get_val(self.act[layer])
-        #varMatrices["hl_%s" %layer] = self.get_val(self.hl_inputs[layer])
+        varMatrices["act_%s" %layer] = self.get_val(self.act[layer], get_func)
 
     return varMatrices
 

@@ -3,12 +3,13 @@ from milp.nn import NN
 from globals import EPSILON, BIN
 
 class MIN_W(NN):
-  def __init__(self, model, data, architecture, bound):
+  def __init__(self, model, data, architecture, bound, reg):
 
-    NN.__init__(self, model, data, architecture, bound)
+    NN.__init__(self, model, data, architecture, bound, reg)
     self.add_abs_params()
     self.add_output_constraints()
     self.calc_objective()
+    self.cutoff = 0
 
   def add_abs_params(self):
     self.abs_weights = {}

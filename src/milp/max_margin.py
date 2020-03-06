@@ -1,8 +1,8 @@
 import numpy as np
 from milp.nn import NN
-from globals import CONT, TARGET_ERROR, MARGIN
+from globals import BIN, MULTIOBJ, TARGET_ERROR, MARGIN, EPSILON
 
-class MIN_HINGE(NN):
+class MAX_MARGIN(NN):
   def __init__(self, model, data, architecture, bound, reg):
 
     NN.__init__(self, model, data, architecture, bound, reg)
@@ -12,16 +12,18 @@ class MIN_HINGE(NN):
     self.add_output_constraints()
     if reg:
       self.add_regularizer()
-    self.calc_objective()
+    if MULTIOBJ:
+      self.calc_multi_obj()
+    else:
+      self.calc_objective()
     # Cutoff set so as not too optimize fully.
-    # Target: >=90% accuracy. 0.25 = (0.5-0)^2 (see objective function)
-    self.cutoff = np.prod(self.output.shape)*TARGET_ERROR*MARGIN*MARGIN
+    self.cutoff = np.prod(self.output.shape)*TARGET_ERROR
 
   def init_output(self):
     self.output = np.full((self.N, self.architecture[-1]), None)
     for k in range(self.N):
       for j in range(self.architecture[-1]):
-        self.output[k,j] = self.add_var(CONT, bound=self.out_bound, name="output_%s-%s" % (j,k))
+        self.output[k,j] = self.add_var(BIN, name="bin_output_%s-%s" % (j,k))
 
   def add_output_constraints(self):
     layer = len(self.architecture) - 1
@@ -38,34 +40,31 @@ class MIN_HINGE(NN):
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]
-        # Approximately normalize to between -1 and 1
         pre_activation = 2*pre_activation/self.out_bound
-        self.add_constraint(self.output[k,j] == pre_activation*self.oh_train_y[k,j])
+        # HYPERPARAMETER 0.5
+        self.add_constraint((self.output[k,j] == 1) >> (pre_activation*self.oh_train_y[k,j] >= MARGIN))
+        self.add_constraint((self.output[k,j] == 0) >> (pre_activation*self.oh_train_y[k,j] <= MARGIN - EPSILON))
 
   def calc_objective(self):
-    def hinge(u):
-      return np.square(np.maximum(0, (MARGIN - u)))
-    npts = 2*self.out_bound+1
-    lb = -1
-    ub = 1
-    ptu = []
-    pthinge = []
-    for i in range(npts):
-      ptu.append(lb + (ub - lb) * i / (npts-1))
-      pthinge.append(hinge(ptu[i]))
+    self.obj = np.prod(self.output.shape) - self.output.sum()
 
-    if self.reg and len(self.architecture) > 2:
-      alpha = 1/sum(self.architecture[1:-1])
-      self.obj = 0
+    if self.reg:
       for layer in self.H:
-        self.obj += self.H[layer].sum()*alpha
-      self.add_constraint(self.obj >= alpha*self.data['oh_train_y'].shape[1])
+        self.obj += self.H[layer].sum()
 
-      self.set_objective()
+    self.set_objective()
+    
 
-    for k in range(self.N):
-      for j in range(self.architecture[-1]):
-        self.m.setPWLObj(self.output[k,j], ptu, pthinge)
+  def calc_multi_obj(self):
+    self.obj = np.prod(self.output.shape) - self.output.sum()
+    self.m.setObjectiveN(self.obj, 0, 2)
+
+    if self.reg:
+      regObj = 0
+      for layer in self.H:
+        regObj += self.H[layer].sum()
+      self.m.setObjectiveN(regObj, 1, 1)
+
 
   def extract_values(self, get_func=lambda z: z.x):
     varMatrices = NN.extract_values(self, get_func)

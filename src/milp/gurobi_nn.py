@@ -1,17 +1,17 @@
 import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
-from helper.misc import inference, calc_accuracy
-from globals import INT, BIN, CONT, LOG
+from helper.misc import infer_and_accuracy
+from globals import INT, BIN, CONT, LOG, MULTIOBJ
 
-def get_gurobi_nn(NN, data, architecture, bound):
+def get_gurobi_nn(NN, data, architecture, bound, reg=False):
   # Init a NN using Gurobi API according to the NN supplied
   class Gurobi_NN(NN):
-    def __init__(self, data, architecture, bound):
+    def __init__(self, data, architecture, bound, reg):
       model = gp.Model("Gurobi_NN")
       if not LOG:
         model.setParam("OutputFlag", 0)
-      NN.__init__(self, model, data, architecture, bound)
+      NN.__init__(self, model, data, architecture, bound, reg)
       
     def add_var(self, precision, name, bound=0):
       if precision == INT:
@@ -38,18 +38,16 @@ def get_gurobi_nn(NN, data, architecture, bound):
       self.m._lastobjbst = GRB.INFINITY
       self.m._lastobjbnd = -GRB.INFINITY
       self.m._progress = []
-      self.m._weights = self.weights
-      self.m._biases = self.biases
-      self.m._data = self.data
-      self.m._architecture = self.architecture
       self.m._val_acc = 0
+      # Needed to access values for NN objects
+      self.m._self = self
       self.m.update()
       self.m.optimize(mycallback)
 
       # Add last value after optimisation finishes
-      gap = 1 - self.m.ObjBound/(self.m.ObjVal + 1e-15)
-      if gap != self.m._progress[-1][4]:
-        self.m._progress.append((self.m.NodeCount, self.m.ObjVal, self.m.ObjBound, self.m.Runtime, gap))
+      #gap = 1 - self.m.ObjBound/(self.m.ObjVal + 1e-15)
+      #if gap != self.m._progress[-1][4]:
+      #  self.m._progress.append((self.m.NodeCount, self.m.ObjVal, self.m.ObjBound, self.m.Runtime, gap))
 
     def get_objective(self):
       return self.m.ObjVal
@@ -73,20 +71,21 @@ def get_gurobi_nn(NN, data, architecture, bound):
       }
       return data
 
-    def get_val(self, maybe_var):
+    # get_func needed to know how to access the variable
+    def get_val(self, maybe_var, get_func):
       tmp = np.zeros(maybe_var.shape)
       for index, count in np.ndenumerate(maybe_var):
         try:
           # Sometimes solvers have "integer" values like 1.000000019, round it to 1
           if maybe_var[index].VType in ['I', 'B']:
-            tmp[index] = round(maybe_var[index].x)
+            tmp[index] = round(get_func(maybe_var[index]))
           else:
-            tmp[index] = maybe_var[index].x
+            tmp[index] = get_func(maybe_var[index])
         except:
           tmp[index] = 0
       return tmp
 
-  return Gurobi_NN(data, architecture, bound)
+  return Gurobi_NN(data, architecture, bound, reg)
 
 
 def mycallback(model, where):
@@ -109,30 +108,35 @@ def mycallback(model, where):
     model._lastobjbst = objbst
     model._lastobjbnd = objbnd
 
-    varMatrices = {}
-    for layer in model._weights:
-      w_shape = model._weights[layer].shape
-      b_shape = model._biases[layer].shape
-      varMatrices["w_%s" % layer] = np.zeros(w_shape)
-      varMatrices["b_%s" % layer] = np.zeros(b_shape)
-      for i in range(w_shape[0]):
-        for j in range(w_shape[1]):
-          if type(model._weights[layer][i,j]) != int:
-            varMatrices["w_%s" % layer][i,j] = model.cbGetSolution(model._weights[layer][i,j])
-      for i in range(b_shape[0]):
-        varMatrices["b_%s" % layer][i] = model.cbGetSolution(model._biases[layer][i])
-
-    infer_train = inference(model._data['train_x'], varMatrices, model._architecture)
-    infer_val = inference(model._data['val_x'], varMatrices, model._architecture)
-    train_acc = calc_accuracy(infer_train, model._data['train_y'])
-    val_acc = calc_accuracy(infer_val, model._data['val_y'])
+    data = model._self.data
+    architecture = model._self.architecture
+    varMatrices = model._self.extract_values(get_func=model.cbGetSolution)
+    train_acc = infer_and_accuracy(data['train_x'], data['train_y'], varMatrices, architecture)
+    val_acc = infer_and_accuracy(data['val_x'], data['val_y'], varMatrices, architecture)
     if LOG:
       print("Train accuracy: %s " % (train_acc))
       print("Validation accuracy: %s " % (val_acc))
+      if model._self.reg:
+        for layer in model._H:
+          hl = varMatrices["H_%s" % layer].sum()
+          print("Hidden layer %s length: %s" % (layer, int(hl)))
 
     model._progress.append((nodecnt, objbst, objbnd, runtime, gap, val_acc))
     model._val_acc = val_acc
 
-    # Maybe remove later
-    if train_acc == 100 and objbst - objbnd < 1:
-      model.terminate()
+    if objbst <= model._self.cutoff:
+      if MULTIOBJ:
+        print("Cutoff first optimization from cutoff value: %s" % model._self.cutoff)
+        model.cbStopOneMultiObj(0)
+      else:
+        print("Terminate from cutoff value: %s" % model._self.cutoff)
+        model.terminate()
+
+    #cutoff = np.prod(model._output.shape)*np.square(0.1)
+    #if model._output[0,0].VType == 'C' and objbst - objbnd < cutoff:
+    #  print("Terminate after cutoff value: %s" % cutoff)
+    #  model.terminate()
+#
+    #elif model.Params.TimeLimit and runtime >= 0.5*model.Params.TimeLimit and train_acc >= 98:
+    #  print("Terminate after time: %s with train acc: %s" % (runtime, train_acc))
+    #  model.terminate()

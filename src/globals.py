@@ -11,3 +11,9 @@ CONT = 2
 EPSILON = 1e-5
 
 LOG = False
+
+MULTIOBJ = False
+
+TARGET_ERROR = 0.1 # 90% Accuracy
+
+MARGIN = 0.5
