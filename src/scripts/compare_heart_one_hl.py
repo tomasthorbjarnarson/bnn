@@ -3,7 +3,7 @@ import numpy as np
 import pathlib
 import json
 from datetime import datetime
-from helper.misc import inference, calc_accuracy, clear_print
+from helper.misc import infer_and_accuracy, clear_print
 from helper.data import load_data, get_architecture
 from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
@@ -11,10 +11,10 @@ from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.max_margin import MAX_MARGIN
 
-
 num_examples = [50, 100, 150, 200]
 
-time = 5*60
+time = 10*60
+time = 2
 seeds = [959323,23421,46262544]
 hl_neurons = 16
 bound = 1
@@ -27,16 +27,11 @@ milps = {
   "max_margin": MAX_MARGIN
 }
 
-max_data = False
-if max_data:
-  num_examples = [200]
-  time = 5*60
-
 short = False
 if short:
   num_examples = num_examples[0:3]
   seeds = [4,8]
-  time = 5
+  time = 3
 
 def compare_heart_one_hl(losses, plot=False):
 
@@ -70,42 +65,32 @@ def compare_heart_one_hl(losses, plot=False):
       data = {"results": all_results[loss], "ts": datetime.now().strftime("%d-%m-%H:%M")}
       json.dump(data, f)
 
-  x = num_examples
-  plt.figure(1)
-  for loss in losses:
-    y, err = get_acc_mean_std(all_results[loss])
-    plt.errorbar(x, y, yerr=err, capsize=3, label="%s test performance" % loss)
-  plt.legend()
-  plt.xlabel("Number of examples")
-  plt.ylabel("Test performance %")
-  plt.title("Compare test accuracies for Heart Dataset with bound %s" % bound)
-  plot_dir = "results/plots/compare_heart_one_hl/performance"
-  pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
-  file_name = "Time:%s-HL_Neurons:%s-Bound:%s-S:%s" % (time, hl_neurons, bound, len(seeds))
-  title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
-  if plot:
-    plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
+  ylabel = "Accuracy %"
+  plot_title = "Train accuracies for Heart Dataset with bound %s" % bound
+  plot_dir = "results/plots/compare_heart_one_hl/%s"
+  plot_results(all_results, "train_accs", losses, 1, ylabel, plot_title, plot_dir % "train_acc")
 
-  plt.figure(2)
-  for loss in losses:
-    y, err = get_runtime_mean_std(all_results[loss])
-    plt.errorbar(x, y, yerr=err, capsize=3, label="%s runtime" % loss)
-  plt.legend()
-  plt.xlabel("Number of examples")
-  plt.ylabel("Runtime [s]")
-  plt.title("Compare runtimes for Heart Dataset with bound %s" % bound)
-  plot_dir = "results/plots/compare_heart_one_hl/runtimes"
-  pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
-  if plot:
-    plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
+  plot_title = "Test accuracies for Heart Dataset with bound %s" % bound
+  plot_results(all_results, "test_accs", losses, 2, ylabel, plot_title, plot_dir % "test_acc")
+
+  ylabel = "Runtime [s]"
+  plot_title = "Runtimes for Heart Dataset with bound %s" % bound
+  plot_results(all_results, "runtimes", losses, 3, ylabel, plot_title, plot_dir % "runtimes")
 
 def run_experiments(loss, experiment, num_experiments):
-  nn_results = []
+  nn_results = {
+    "train_accs": {},
+    "test_accs": {},
+    "runtimes": {},
+    "objs": {}
+  }
   i = 0
   for N in num_examples:
     i += 1
-    accs = []
-    runtimes = []
+    nn_results["train_accs"][N] = []
+    nn_results["test_accs"][N] = []
+    nn_results["runtimes"][N] = []
+    nn_results["objs"][N] = []
     clear_print("Max time left: %s" % get_time_left(i, experiment, num_experiments))
     for s in seeds:
       data = load_data("heart", N, s)
@@ -117,25 +102,34 @@ def run_experiments(loss, experiment, num_experiments):
       obj = nn.get_objective()
       runtime = nn.get_runtime()
       varMatrices = nn.extract_values()
+      train_acc = infer_and_accuracy(nn.data["train_x"], nn.data["train_y"], varMatrices, nn.architecture)
+      test_acc = infer_and_accuracy(nn.data["test_x"], nn.data["test_y"], varMatrices, nn.architecture)
 
-      infer_test = inference(nn.data["test_x"], varMatrices, nn.architecture)
-      test_acc = calc_accuracy(infer_test, nn.data["test_y"])
-      accs.append(test_acc)
-      runtimes.append(runtime)
-
-    nn_results.append((accs, runtimes))
+      nn_results["train_accs"][N].append(train_acc)
+      nn_results["test_accs"][N].append(test_acc)
+      nn_results["runtimes"][N].append(runtime)
+      nn_results["objs"][N].append(obj)
 
   return nn_results
 
+def plot_results(all_results, result_type, losses, index, ylabel, title, plot_dir):
+  x = num_examples
+  plt.figure(index)
+  for loss in losses:
+    y, err = get_mean_std(all_results[loss][result_type].values())
+    plt.errorbar(x, y, yerr=err, capsize=3, label=loss)
+  plt.legend()
+  plt.xlabel("Number of examples")
+  plt.ylabel(ylabel)
+  plt.title(title)
+  pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
+  file_name = "Time:%s-HL_Neurons:%s-Bound:%s-S:%s" % (time, hl_neurons, bound, len(seeds))
+  title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
+  plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
-def get_acc_mean_std(results):
-  mean = [np.mean(z[0]) for z in results]
-  std = [np.std(z[0]) for z in results]
-  return mean, std
-
-def get_runtime_mean_std(results):
-  mean = [np.mean(z[1]) for z in results]
-  std = [np.std(z[1]) for z in results]
+def get_mean_std(results):
+  mean = [np.mean(z) for z in results]
+  std = [np.std(z) for z in results]
   return mean, std
 
 def get_time_left(example, experiment, num_experiments):
