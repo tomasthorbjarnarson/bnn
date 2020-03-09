@@ -11,7 +11,7 @@ class MAX_CORRECT(NN):
     self.init_output()
     self.add_output_constraints()
     self.calc_objective()
-    self.cutoff = np.prod(self.output.shape)*TARGET_ERROR
+    self.cutoff = self.N*TARGET_ERROR
 
   def init_output(self):
     self.output = np.full((self.N, self.architecture[-1]), None)

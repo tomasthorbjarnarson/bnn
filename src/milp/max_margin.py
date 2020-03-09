@@ -23,7 +23,7 @@ class MAX_MARGIN(NN):
     self.output = np.full((self.N, self.architecture[-1]), None)
     for k in range(self.N):
       for j in range(self.architecture[-1]):
-        self.output[k,j] = self.add_var(BIN, name="bin_output_%s-%s" % (j,k))
+        self.output[k,j] = self.add_var(BIN, name="output_%s-%s" % (j,k))
 
   def add_output_constraints(self):
     layer = len(self.architecture) - 1
