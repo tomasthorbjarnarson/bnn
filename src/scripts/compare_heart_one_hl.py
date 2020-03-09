@@ -14,7 +14,6 @@ from milp.max_margin import MAX_MARGIN
 num_examples = [50, 100, 150, 200]
 
 time = 10*60
-time = 2
 seeds = [959323,23421,46262544]
 hl_neurons = 16
 bound = 1
