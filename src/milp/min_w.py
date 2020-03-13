@@ -14,8 +14,6 @@ class MIN_W(NN):
   def add_abs_params(self):
     self.abs_weights = {}
     self.abs_biases = {}
-    # All pixels that are 0 in every example are considered dead
-    dead = np.all(self.train_x == 0, axis=0)
 
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
       layer = lastLayer + 1
@@ -26,7 +24,7 @@ class MIN_W(NN):
 
       for j in range(neurons_out):
         for i in range(neurons_in):
-          if layer == 1 and dead[i]:
+          if layer == 1 and self.dead[i]:
             # Dead inputs should have 0 weight and therefore 0 absolute weight
             self.abs_weights[layer][i,j] = 0
           else:

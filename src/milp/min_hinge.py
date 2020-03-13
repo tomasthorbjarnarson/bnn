@@ -15,7 +15,7 @@ class MIN_HINGE(NN):
     self.calc_objective()
     # Cutoff set so as not too optimize fully.
     # Target: >=90% accuracy. 0.25 = (0.5-0)^2 (see objective function)
-    self.cutoff = np.prod(self.output.shape)*TARGET_ERROR*MARGIN*MARGIN
+    self.cutoff = self.N*TARGET_ERROR*MARGIN*MARGIN
 
   def init_output(self):
     self.output = np.full((self.N, self.architecture[-1]), None)

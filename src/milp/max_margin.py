@@ -17,7 +17,7 @@ class MAX_MARGIN(NN):
     else:
       self.calc_objective()
     # Cutoff set so as not too optimize fully.
-    self.cutoff = np.prod(self.output.shape)*TARGET_ERROR
+    self.cutoff = self.N*TARGET_ERROR
 
   def init_output(self):
     self.output = np.full((self.N, self.architecture[-1]), None)
@@ -58,6 +58,7 @@ class MAX_MARGIN(NN):
   def calc_multi_obj(self):
     self.obj = np.prod(self.output.shape) - self.output.sum()
     self.m.setObjectiveN(self.obj, 0, 2)
+    #self.m.ObjNAbsTol = 3
 
     if self.reg:
       regObj = 0

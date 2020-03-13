@@ -18,7 +18,7 @@ def get_unique_examples(train_x, train_y, N):
   return indices[0:N]
 
 def normalize(matrix, row=False):
-  # Have one less precision than global minimum comparison
+  # Have same precision as global minimum comparison
   precision = int(np.log10(EPSILON))*-1
   if row:
     # Normalize each column

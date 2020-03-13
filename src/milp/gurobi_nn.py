@@ -117,14 +117,14 @@ def mycallback(model, where):
       print("Train accuracy: %s " % (train_acc))
       print("Validation accuracy: %s " % (val_acc))
       if model._self.reg:
-        for layer in model._H:
+        for layer in model._self.H:
           hl = varMatrices["H_%s" % layer].sum()
           print("Hidden layer %s length: %s" % (layer, int(hl)))
 
     model._progress.append((nodecnt, objbst, objbnd, runtime, gap, val_acc))
     model._val_acc = val_acc
 
-    if objbst <= model._self.cutoff:
+    if int(objbst) <= model._self.cutoff:
       if MULTIOBJ:
         print("Cutoff first optimization from cutoff value: %s" % model._self.cutoff)
         model.cbStopOneMultiObj(0)

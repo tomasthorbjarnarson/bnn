@@ -44,7 +44,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
   
   solver = args.solver
-  hls = [int(x) for x in args.hls.split("-")]
+  hls = [int(x) for x in args.hls.split("-") if len(args.hls) > 0]
 
   N = args.ex
   focus = args.focus
