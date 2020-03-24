@@ -27,7 +27,7 @@ milps = {
   "max_margin": MAX_MARGIN
 }
 
-short = True
+short = False
 if short:
   num_examples = [20,40,60,80,100,120,140]
   seeds = [745,648]
