@@ -105,7 +105,7 @@ def load_keras(dataset, N):
 
   data["test_x"] = test_x
   data["test_y"] = test_y
-  data["oh_val_y"] = oh_encode(test_y)
+  data["oh_test_y"] = oh_encode(test_y)
 
   return data
 

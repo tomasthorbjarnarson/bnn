@@ -12,7 +12,7 @@ from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.max_margin import MAX_MARGIN
 
-num_examples = [50, 100, 150, 200]
+num_examples = [40, 80, 120, 160, 200, 240, 280]
 
 time = 10*60
 seeds = [1348612,7864568,9434861]
@@ -29,9 +29,9 @@ milps = {
 
 short = True
 if short:
-  num_examples = [10,20,30,40,50,60,70,80,90,100]
+  num_examples = [20,40,60,80,100,120,140]
   seeds = [745,648]
-  time = 5
+  time = 10
 
 def adult_losses(losses, plot=False):
 
@@ -133,7 +133,7 @@ def plot_results(all_results, result_type, losses, index, ylabel, title, plot_di
   pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
   file_name = "Time:%s-HL_Neurons:%s-Bound:%s-S:%s" % (time, hl_neurons, bound, len(seeds))
   title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
-  #plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
+  plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
   #plt.show()
 
 def get_mean_std(results):

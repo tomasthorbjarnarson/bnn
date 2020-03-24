@@ -4,7 +4,7 @@ from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.max_margin import MAX_MARGIN
-from helper.misc import infer_and_accuracy, clear_print, get_bound_matrix,get_alt_bound_matrix,get_mean_vars
+from helper.misc import infer_and_accuracy, clear_print, get_bound_matrix,get_alt_bound_matrix,get_mean_vars,get_network_size
 from helper.data import load_data, get_batches, get_architecture
 from helper.save_data import DataSaver
 import argparse
@@ -170,6 +170,10 @@ if __name__ == '__main__':
   tmp_inf[tmp_inf < 0] = -1
   inf = np.dot(tmp_inf, varMatrices['w_2']) + varMatrices['b_2']
   norm = 2*inf / ((hls[0]+1)*bound)
+
+  net_size = get_network_size(architecture, bound)
+  print("Network memory: %s Bytes" % net_size)
+
   set_trace()
 
   if args.save:

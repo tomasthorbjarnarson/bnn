@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import math
 
 seed = 0
 
@@ -107,3 +108,15 @@ def clear_print(text):
   print("====================================")
   print(text)
   print("====================================")
+
+# [108-16-2], 3
+def get_network_size(architecture, bound):
+  bound_bits = math.floor(math.log2(bound))+ 1 + 1# extra + 1 because negative is allowed
+  total_weights = 0
+  total_biases = 0
+  for i, layer_size in enumerate(architecture[1:]):
+    last_layer_size = architecture[i]
+    total_weights += layer_size*last_layer_size
+    total_biases += layer_size
+
+  return (total_biases + total_weights)*bound_bits / 8 # / 8 for bytes instead of bits
