@@ -3,7 +3,7 @@ from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
-from milp.max_margin import MAX_MARGIN
+from milp.sat_margin import SAT_MARGIN
 from helper.misc import infer_and_accuracy, clear_print, get_bound_matrix,get_alt_bound_matrix,get_mean_vars,get_network_size
 from helper.data import load_data, get_batches, get_architecture
 from helper.save_data import DataSaver
@@ -15,7 +15,7 @@ milps = {
   "min_w": MIN_W,
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
-  "max_margin": MAX_MARGIN
+  "sat_margin": SAT_MARGIN
 }
 
 solvers = {
@@ -162,6 +162,8 @@ if __name__ == '__main__':
 
   w1 = varMatrices['w_1']
   b1 = varMatrices['b_1']
+  w2 = varMatrices['w_2']
+  b2 = varMatrices['b_2']
   act1 = varMatrices['act_1']
   train = nn.data['train_x']
 

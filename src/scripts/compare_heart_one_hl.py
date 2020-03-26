@@ -10,7 +10,7 @@ from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
-from milp.max_margin import MAX_MARGIN
+from milp.sat_margin import SAT_MARGIN
 from gd.gd_nn import GD_NN
 
 num_examples = [50, 100, 150, 200]
@@ -25,7 +25,7 @@ milps = {
   "min_w": MIN_W,
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
-  "max_margin": MAX_MARGIN
+  "sat_margin": SAT_MARGIN
 }
 
 gds = {

@@ -2,7 +2,7 @@ import numpy as np
 from milp.nn import NN
 from globals import BIN, MULTIOBJ, TARGET_ERROR, MARGIN, EPSILON
 
-class MAX_MARGIN(NN):
+class SAT_MARGIN(NN):
   def __init__(self, model, data, architecture, bound, reg):
 
     NN.__init__(self, model, data, architecture, bound, reg)
