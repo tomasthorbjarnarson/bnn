@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
+import seaborn as sns
 import json
 from datetime import datetime
 from helper.misc import infer_and_accuracy, clear_print
@@ -10,13 +11,14 @@ from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.max_margin import MAX_MARGIN
+from gd.gd_nn import GD_NN
 
 num_examples = [50, 100, 150, 200]
 
 time = 10*60
 seeds = [959323,23421,46262544]
 hl_neurons = 16
-bound = 1
+bound = 7
 focus = 1
 
 milps = {
@@ -26,7 +28,11 @@ milps = {
   "max_margin": MAX_MARGIN
 }
 
-short = False
+gds = {
+  "gd_nn": GD_NN
+}
+
+short = True
 if short:
   num_examples = num_examples[0:3]
   seeds = [4,8]
@@ -57,6 +63,8 @@ def compare_heart_one_hl(losses, plot=False):
 
     if loss in milps:
       all_results[loss] = run_experiments(loss, i, num_experiments)
+    elif loss in gds:
+      all_results[loss] = run_gd_experiments(loss, i, num_experiments)
     else:
       print("Loss %s unknown" % loss)
       continue
@@ -101,8 +109,44 @@ def run_experiments(loss, experiment, num_experiments):
       obj = nn.get_objective()
       runtime = nn.get_runtime()
       varMatrices = nn.extract_values()
-      train_acc = infer_and_accuracy(nn.data["train_x"], nn.data["train_y"], varMatrices, nn.architecture)
-      test_acc = infer_and_accuracy(nn.data["test_x"], nn.data["test_y"], varMatrices, nn.architecture)
+      train_acc = infer_and_accuracy(nn.data["train_x"], nn.data["train_y"], varMatrices, arch)
+      test_acc = infer_and_accuracy(nn.data["test_x"], nn.data["test_y"], varMatrices, arch)
+
+      nn_results["train_accs"][N].append(train_acc)
+      nn_results["test_accs"][N].append(test_acc)
+      nn_results["runtimes"][N].append(runtime)
+      nn_results["objs"][N].append(obj)
+
+  return nn_results
+
+def run_gd_experiments(loss, experiment, num_experiments):
+  nn_results = {
+    "train_accs": {},
+    "test_accs": {},
+    "runtimes": {},
+    "objs": {}
+  }
+  i = 0
+  lr = 1e-3
+  for N in num_examples:
+    i += 1
+    nn_results["train_accs"][N] = []
+    nn_results["test_accs"][N] = []
+    nn_results["runtimes"][N] = []
+    nn_results["objs"][N] = []
+    clear_print("Max time left: %s" % get_time_left(i, experiment, num_experiments))
+    for s in seeds:
+      data = load_data("heart", N, s)
+      arch = get_architecture(data, [hl_neurons])
+
+      clear_print("%s:  HL_Neurons: %s, N: %s, Seed: %s" % (loss, hl_neurons, N, s))
+      nn = GD_NN(data, N, arch, lr, bound, s)
+      nn.train(60*time)
+      obj = float(nn.get_objective())
+      runtime = nn.get_runtime()
+      varMatrices = nn.extract_values()
+      train_acc = infer_and_accuracy(nn.data["train_x"], nn.data["train_y"], varMatrices, arch)
+      test_acc = infer_and_accuracy(nn.data["test_x"], nn.data["test_y"], varMatrices, arch)
 
       nn_results["train_accs"][N].append(train_acc)
       nn_results["test_accs"][N].append(test_acc)
@@ -114,9 +158,14 @@ def run_experiments(loss, experiment, num_experiments):
 def plot_results(all_results, result_type, losses, index, ylabel, title, plot_dir):
   x = num_examples
   plt.figure(index)
+  colors = sns.color_palette("husl", len(losses))
+  i = 0
   for loss in losses:
     y, err = get_mean_std(all_results[loss][result_type].values())
-    plt.errorbar(x, y, yerr=err, capsize=3, label=loss)
+    #plt.errorbar(x, y, yerr=err, capsize=3, label=loss)
+    plt.plot(x,y, label=loss, color = colors[i])
+    plt.fill_between(x, y - err, y + err, alpha=0.3, facecolor=colors[i])
+    i += 1
   plt.legend()
   plt.xlabel("Number of examples")
   plt.ylabel(ylabel)
@@ -125,10 +174,11 @@ def plot_results(all_results, result_type, losses, index, ylabel, title, plot_di
   file_name = "Time:%s-HL_Neurons:%s-Bound:%s-S:%s" % (time, hl_neurons, bound, len(seeds))
   title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
   plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
+  #plt.show()
 
 def get_mean_std(results):
-  mean = [np.mean(z) for z in results]
-  std = [np.std(z) for z in results]
+  mean = np.array([np.mean(z) for z in results])
+  std = np.array([np.std(z) for z in results])
   return mean, std
 
 def get_time_left(example, experiment, num_experiments):

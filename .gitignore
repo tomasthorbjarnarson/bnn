@@ -1,3 +1,4 @@
 *.log
 *.txt
 **/old/*
+src/gd_old/*
