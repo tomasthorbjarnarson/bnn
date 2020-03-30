@@ -4,6 +4,7 @@ from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
+from milp.max_m import MAX_M
 from helper.misc import infer_and_accuracy, clear_print, get_bound_matrix,get_alt_bound_matrix,get_mean_vars,get_network_size
 from helper.data import load_data, get_batches, get_architecture
 from helper.save_data import DataSaver
@@ -13,6 +14,7 @@ from pdb import set_trace
 
 milps = {
   "min_w": MIN_W,
+  "max_m": MAX_M,
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
   "sat_margin": SAT_MARGIN
@@ -162,16 +164,17 @@ if __name__ == '__main__':
 
   w1 = varMatrices['w_1']
   b1 = varMatrices['b_1']
-  w2 = varMatrices['w_2']
-  b2 = varMatrices['b_2']
-  act1 = varMatrices['act_1']
-  train = nn.data['train_x']
+  if len(architecture) > 2:
+    w2 = varMatrices['w_2']
+    b2 = varMatrices['b_2']
+    act1 = varMatrices['act_1']
+    train = nn.data['train_x']
 
-  tmp_inf = np.dot(train, w1) + b1
-  tmp_inf[tmp_inf >= 0] = 1
-  tmp_inf[tmp_inf < 0] = -1
-  inf = np.dot(tmp_inf, varMatrices['w_2']) + varMatrices['b_2']
-  norm = 2*inf / ((hls[0]+1)*bound)
+    tmp_inf = np.dot(train, w1) + b1
+    tmp_inf[tmp_inf >= 0] = 1
+    tmp_inf[tmp_inf < 0] = -1
+    inf = np.dot(tmp_inf, varMatrices['w_2']) + varMatrices['b_2']
+    norm = 2*inf / ((hls[0]+1)*bound)
 
   net_size = get_network_size(architecture, bound)
   print("Network memory: %s Bytes" % net_size)

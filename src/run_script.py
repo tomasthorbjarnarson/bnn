@@ -5,6 +5,7 @@ from scripts.compare_precision_heart import compare_precision_heart
 from scripts.compare_batch_training import compare_batch_training
 from scripts.adult_losses import adult_losses
 from scripts.adult_push import adult_push
+from scripts.adult_precision import adult_precision
 from time import time
 import argparse
 
@@ -34,6 +35,8 @@ if __name__ == '__main__':
     adult_losses(losses, save)
   elif script == 'adult_push':
     adult_push(losses, save)
+  elif script == 'adult_precision':
+    adult_precision(losses, save)
   else:
     raise Exception("Script %s not known" % script)
   end = time()

@@ -1,20 +1,18 @@
-import os
-import subprocess
-from subprocess import PIPE
-import re
 import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import json
 from datetime import datetime
 from globals import ARCHITECTURES
-from helper.misc import inference, calc_accuracy, clear_print
+from helper.misc import infer_and_accuracy, clear_print
 from helper.data import load_data
 from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
+from milp.max_m import MAX_M
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
+from gd.gd_nn import GD_NN
 
 Icarte_dir = '../Icarte/bnn/src'
 
@@ -33,13 +31,14 @@ seeds = [1,2,3]
 
 milps = {
   "min_w": MIN_W,
+  "max_m": MAX_M,
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
   "sat_margin": SAT_MARGIN
 }
 
 
-short = False
+short = True
 if short:
   num_examples = {
     1: [1,2,3],
@@ -83,8 +82,8 @@ def compare_test_accuracies(losses, plot=False):
 
     if loss in milps:
       all_results[loss] = run_experiments(loss, i, num_experiments)
-    elif loss == "gd":
-      all_results["gd"] = run_gd_experiments(i, num_experiments)
+    elif loss == "gd_nn":
+      all_results["gd_nn"] = run_gd_experiments(i, num_experiments)
     else:
       print("Loss %s unknown" % loss)
       continue
@@ -125,30 +124,28 @@ def compare_test_accuracies(losses, plot=False):
       plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
 
 def run_gd_experiments(experiment, num_experiments):
-  current_dir = os.getcwd()
-  os.chdir(Icarte_dir)
   gd_results = {}
-  run_str = 'python run.py --model="gd_b" --lr=1e-3 --seed=%s --hls=%s --exs=%s --ins=0 --to=%s'
+  lr = 1e-3
   for i in ARCHITECTURES:
     gd_results[i] = []
-    hls = i-1
+    arch = ARCHITECTURES[i]
     for N in num_examples[i]:
-      acc = []
-      runtime = []
+      accs = []
+      runtimes = []
       clear_print("Max time left: %s" % get_time_left(i, N, experiment, num_experiments))
       for s in seeds:
-        clear_print("GD:  hls: %s, N: %s, Seed: %s" % (hls, N, s))
+        data = load_data("mnist", N*10, s)
+        clear_print("GD:  ARCH: %s, N: %s, Seed: %s" % (arch, N*10, s))
 
-        result = subprocess.run(run_str % (s, hls, N, times[i]), shell=True, stdout=PIPE, stderr=PIPE)
-        test_perf = re.findall(b"Test .*", result.stdout)[0]
-        time = re.findall(b"= .*\[m]", result.stdout)[0]
-        test_perf = float(test_perf[-4:])*100
-        time = float(time[1:-3])*60
-        acc.append(test_perf)
-        runtime.append(time)
-      gd_results[i].append((acc, runtime))
-
-  os.chdir(current_dir)
+        nn = GD_NN(data, N, arch, lr, 1, s)
+        nn.train(60*times[i])
+        obj = float(nn.get_objective())
+        runtime = nn.get_runtime()
+        varMatrices = nn.extract_values()
+        test_acc = infer_and_accuracy(nn.data["test_x"], nn.data["test_y"], varMatrices, arch)
+        accs.append(test_acc)
+        runtimes.append(runtime)
+      gd_results[i].append((accs, runtimes))
 
   return gd_results
 
@@ -171,8 +168,7 @@ def run_experiments(loss, experiment, num_experiments):
         runtime = nn.get_runtime()
         varMatrices = nn.extract_values()
 
-        infer_test = inference(nn.data["test_x"], varMatrices, nn.architecture)
-        test_acc = calc_accuracy(infer_test, nn.data["test_y"])
+        test_acc = infer_and_accuracy(nn.data["test_x"], nn.data["test_y"], varMatrices, arch)
         accs.append(test_acc)
         runtimes.append(runtime)
 

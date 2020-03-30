@@ -2,7 +2,13 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 from helper.misc import infer_and_accuracy
-from globals import INT, BIN, CONT, LOG, MULTIOBJ
+from globals import INT, BIN, CONT, LOG, MULTIOBJ, DO_CUTOFF
+
+vtypes = {
+  INT: GRB.INTEGER,
+  BIN: GRB.BINARY,
+  CONT: GRB.CONTINUOUS
+}
 
 def get_gurobi_nn(NN, data, architecture, bound, reg=False):
   # Init a NN using Gurobi API according to the NN supplied
@@ -13,21 +19,31 @@ def get_gurobi_nn(NN, data, architecture, bound, reg=False):
         model.setParam("OutputFlag", 0)
       NN.__init__(self, model, data, architecture, bound, reg)
       
-    def add_var(self, precision, name, bound=0):
-      if precision == INT:
-        return self.m.addVar(vtype=GRB.INTEGER, lb=-bound, ub=bound, name=name)
-      elif precision == BIN:
-        return self.m.addVar(vtype=GRB.BINARY, name=name)
-      elif precision == CONT:
-        return self.m.addVar(vtype=GRB.CONTINUOUS, lb=-bound, ub=bound, name=name)
-      else:
+    def add_var(self, precision, name, bound=None, lb=None, ub=None):
+      if precision not in vtypes:
         raise Exception('Parameter precision not known: %s' % precision)
+
+      if precision == BIN:
+        return self.m.addVar(vtype=GRB.BINARY, name=name)
+      else:
+        if not bound:
+          if lb != None and ub != None:
+            return self.m.addVar(vtype=vtypes[precision], lb=lb, ub=ub, name=name)
+          elif lb != None:
+            return self.m.addVar(vtype=vtypes[precision], lb=lb, name=name)
+          elif ub != None:
+            return self.m.addVar(vtype=vtypes[precision], ub=ub, name=name)
+        else:
+            return self.m.addVar(vtype=vtypes[precision], lb=-bound, ub=bound, name=name)
 
     def add_constraint(self, constraint):
       self.m.addConstr(constraint)
 
-    def set_objective(self):
-      self.m.setObjective(self.obj, GRB.MINIMIZE)
+    def set_objective(self, sense="min"):
+      if sense == "min":
+        self.m.setObjective(self.obj, GRB.MINIMIZE)
+      else:
+        self.m.setObjective(self.obj, GRB.MAXIMIZE)
       
     def train(self, time=None, focus=None):
       if time:
@@ -124,7 +140,8 @@ def mycallback(model, where):
     model._progress.append((nodecnt, objbst, objbnd, runtime, gap, val_acc))
     model._val_acc = val_acc
 
-    if int(objbst) <= model._self.cutoff:
+    # ModelSense == 1 makes sure it is minimization
+    if DO_CUTOFF and int(objbst) <= model._self.cutoff and model.ModelSense == 1:
       if MULTIOBJ:
         print("Cutoff first optimization from cutoff value: %s" % model._self.cutoff)
         model.cbStopOneMultiObj(0)

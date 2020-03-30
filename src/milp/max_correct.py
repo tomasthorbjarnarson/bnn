@@ -7,7 +7,10 @@ class MAX_CORRECT(NN):
 
     NN.__init__(self, model, data, architecture, bound, reg)
 
-    self.out_bound = (self.architecture[-2]+1)*self.bound
+    if len(architecture) > 2:
+      self.out_bound = (self.architecture[-2]+1)*self.bound
+    else:
+      self.out_bound = np.mean(data['train_x'])*architecture[0]
     self.init_output()
     self.add_output_constraints()
     self.calc_objective()
