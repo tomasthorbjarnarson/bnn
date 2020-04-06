@@ -2,7 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 from helper.misc import infer_and_accuracy
-from globals import INT, BIN, CONT, LOG, MULTIOBJ, DO_CUTOFF
+from globals import INT, BIN, CONT, LOG, DO_CUTOFF
 
 vtypes = {
   INT: GRB.INTEGER,
@@ -142,7 +142,7 @@ def mycallback(model, where):
 
     # ModelSense == 1 makes sure it is minimization
     if DO_CUTOFF and int(objbst) <= model._self.cutoff and model.ModelSense == 1:
-      if MULTIOBJ:
+      if model._self.reg == -1:
         print("Cutoff first optimization from cutoff value: %s" % model._self.cutoff)
         model.cbStopOneMultiObj(0)
       else:

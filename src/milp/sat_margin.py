@@ -1,6 +1,6 @@
 import numpy as np
 from milp.nn import NN
-from globals import BIN, MULTIOBJ, TARGET_ERROR, MARGIN, EPSILON
+from globals import BIN, TARGET_ERROR, MARGIN, EPSILON
 
 class SAT_MARGIN(NN):
   def __init__(self, model, data, architecture, bound, reg):
@@ -15,7 +15,7 @@ class SAT_MARGIN(NN):
     self.add_output_constraints()
     if reg:
       self.add_regularizer()
-    if MULTIOBJ:
+    if reg == -1:
       self.calc_multi_obj()
     else:
       self.calc_objective()
@@ -53,7 +53,7 @@ class SAT_MARGIN(NN):
 
     if self.reg:
       for layer in self.H:
-        self.obj += self.H[layer].sum()
+        self.obj += self.reg*self.H[layer].sum()
 
     self.set_objective()
     

@@ -79,7 +79,7 @@ class GD_NN:
 
   def get_objective(self):
     loss = self.sess.run(self.loss, feed_dict=self.train_dict)
-    return loss
+    return float(loss)
 
   def get_runtime(self):
     return self.runtime

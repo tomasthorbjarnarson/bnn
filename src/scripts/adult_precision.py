@@ -32,11 +32,11 @@ if max_data:
   num_examples = [200]
   time = 5*60
 
-short = False
+short = True
 if short:
-  num_examples = [40, 60, 80, 100, 120]
-  bounds = [1,3,7,15]
-  seeds = [10,20]
+  num_examples = [40, 60, 80]
+  bounds = [1,3,7]
+  seeds = [1348612,7864568]
   time = 5
 
 def adult_precision(losses, plot=False):

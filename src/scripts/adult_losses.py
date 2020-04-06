@@ -11,6 +11,7 @@ from milp.min_w import MIN_W
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
+from gd.gd_nn import GD_NN
 
 num_examples = [40, 80, 120, 160, 200, 240, 280]
 
@@ -27,7 +28,11 @@ milps = {
   "sat_margin": SAT_MARGIN
 }
 
-short = False
+gds = {
+  "gd_nn": GD_NN
+}
+
+short = True
 if short:
   num_examples = [20,40,60,80,100,120,140]
   seeds = [745,648]
@@ -58,6 +63,8 @@ def adult_losses(losses, plot=False):
 
     if loss in milps:
       all_results[loss] = run_experiments(loss, i, num_experiments)
+    elif loss in gds:
+      all_results[loss] = run_gd_experiments(loss, i, num_experiments)
     else:
       print("Loss %s unknown" % loss)
       continue
@@ -110,6 +117,42 @@ def run_experiments(loss, experiment, num_experiments):
 
       nn_results["train_accs"][N].append(train_acc)
       nn_results["val_accs"][N].append(val_acc)
+      nn_results["test_accs"][N].append(test_acc)
+      nn_results["runtimes"][N].append(runtime)
+      nn_results["objs"][N].append(obj)
+
+  return nn_results
+
+def run_gd_experiments(loss, experiment, num_experiments):
+  nn_results = {
+    "train_accs": {},
+    "test_accs": {},
+    "runtimes": {},
+    "objs": {}
+  }
+  i = 0
+  lr = 1e-3
+  for N in num_examples:
+    i += 1
+    nn_results["train_accs"][N] = []
+    nn_results["test_accs"][N] = []
+    nn_results["runtimes"][N] = []
+    nn_results["objs"][N] = []
+    clear_print("Max time left: %s" % get_time_left(i, experiment, num_experiments))
+    for s in seeds:
+      data = load_data("adult", N, s)
+      arch = get_architecture(data, [hl_neurons])
+
+      clear_print("%s:  HL_Neurons: %s, N: %s, Seed: %s" % (loss, hl_neurons, N, s))
+      nn = GD_NN(data, N, arch, lr, bound, s)
+      nn.train(60*time)
+      obj = nn.get_objective()
+      runtime = nn.get_runtime()
+      varMatrices = nn.extract_values()
+      train_acc = infer_and_accuracy(nn.data["train_x"], nn.data["train_y"], varMatrices, arch)
+      test_acc = infer_and_accuracy(nn.data["test_x"], nn.data["test_y"], varMatrices, arch)
+
+      nn_results["train_accs"][N].append(train_acc)
       nn_results["test_accs"][N].append(test_acc)
       nn_results["runtimes"][N].append(runtime)
       nn_results["objs"][N].append(obj)

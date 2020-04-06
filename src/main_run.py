@@ -5,7 +5,7 @@ from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
 from milp.max_m import MAX_M
-from helper.misc import infer_and_accuracy, clear_print, get_bound_matrix,get_alt_bound_matrix,get_mean_vars,get_network_size
+from helper.misc import infer_and_accuracy, clear_print, get_bound_matrix,get_mean_vars,get_network_size,strip_network
 from helper.data import load_data, get_batches, get_architecture
 from helper.save_data import DataSaver
 import argparse
@@ -39,7 +39,8 @@ if __name__ == '__main__':
   parser.add_argument('--data', default="mnist", type=str)
   parser.add_argument('--bound', default=1, type=int)
   parser.add_argument('--batch', default=0, type=int)
-  parser.add_argument('--reg', action='store_true', help="An optional flag to regularize network")
+  #parser.add_argument('--reg', action='store_true', help="An optional flag to regularize network")
+  parser.add_argument('--reg', default=0, type=float)
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
   parser.add_argument('--all', action='store_true', help="An optional flag to run on all data")
   parser.add_argument('--mean', action='store_true', help="An optional flag to use mean variables")
@@ -179,6 +180,15 @@ if __name__ == '__main__':
   net_size = get_network_size(architecture, bound)
   print("Network memory: %s Bytes" % net_size)
 
+  stripped,new_arch = strip_network(varMatrices, architecture)
+  new_net_size = get_network_size(new_arch, bound)
+  print("New Network memory: %s Bytes" % new_net_size)
+
+  stripped_train_acc = infer_and_accuracy(nn.data['train_x'], nn.data["train_y"], stripped, new_arch)
+  stripped_test_acc = infer_and_accuracy(nn.data['test_x'], nn.data["test_y"], stripped, new_arch)
+
+  print("Stripped Training accuracy: %s " % (stripped_train_acc))
+  print("Stripped Testing accuracy: %s " % (stripped_test_acc))
   set_trace()
 
   if args.save:

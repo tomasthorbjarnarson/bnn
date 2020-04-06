@@ -178,6 +178,8 @@ def load_adult(N):
     tmp = pd.get_dummies(all_data[cat], prefix=cat)
     frames.append(tmp)
 
+  # Female and Male become cols 64 and 65, respectively
+
   all_data = pd.concat(frames, axis=1)
   all_data = all_data.drop(columns=categorical)
   all_data['income'] = all_data['income'].map({' <=50K': 0, ' >50K': 1, ' <=50K.': 0, ' >50K.': 1})

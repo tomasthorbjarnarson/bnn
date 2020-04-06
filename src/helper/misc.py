@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import math
+import copy
 
 seed = 0
 
@@ -120,3 +121,20 @@ def get_network_size(architecture, bound):
     total_biases += layer_size
 
   return (total_biases + total_weights)*bound_bits / 8 # / 8 for bytes instead of bits
+
+def strip_network(varMatrices, arch):
+  if 'H_1' not in varMatrices:
+    print("Nothing to strip")
+    return varMatrices,arch
+  stripped = copy.deepcopy(varMatrices)
+  new_arch = copy.deepcopy(arch)
+  for lastLayer, neurons_out in enumerate(arch[1:-1]):
+    layer = lastLayer + 1
+    nextLayer = layer+1
+    h = np.array([int(v) for v in stripped['H_%s' % layer]])
+    h = np.array(h == 1)
+    stripped['w_%s' % layer] = stripped['w_%s' % layer][:,h]
+    stripped['b_%s' % layer] = stripped['b_%s' % layer][h]
+    stripped['w_%s' % nextLayer] = stripped['w_%s' % nextLayer][h,:]
+    new_arch[layer] = h.sum()
+  return stripped, new_arch
