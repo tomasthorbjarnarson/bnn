@@ -1,11 +1,6 @@
 from scripts.compare_gurobi_cplex import compare_gurobi_cplex
 from scripts.compare_test_accuracies import compare_test_accuracies
-from scripts.compare_heart_one_hl import compare_heart_one_hl
-from scripts.compare_precision_heart import compare_precision_heart
 from scripts.compare_batch_training import compare_batch_training
-from scripts.adult_losses import adult_losses
-from scripts.adult_push import adult_push
-from scripts.adult_precision import adult_precision
 from scripts.script_master import Script_Master
 from time import time
 import argparse
@@ -23,6 +18,7 @@ if __name__ == '__main__':
   data = args.data
   show = args.show
   short = args.short
+  print("short", short)
   print("show", show)
   losses = args.losses.split(",")
 
@@ -48,14 +44,20 @@ if __name__ == '__main__':
   elif script =="push":
     num_examples = [20]
   elif script =="reg":
-    hls=[[40]]
-    num_examples = [80]
+    hls=[[100]]
+    num_examples = [200]
+    max_time = 24*60
+    bounds = [15]
     regs = [0, -1, 1, 0.1, 0.01]
+    if short:
+      hls = [[30]]
+      num_examples = [100]
+      regs = [0, -1, 0.1]
 
   if short:
     num_examples = num_examples[0:3]
     seeds = seeds[0:2]
-    max_time = 5
+    max_time = 2
 
   start = time()
   if script == 'compare_gurobi_cplex':
@@ -64,14 +66,14 @@ if __name__ == '__main__':
     compare_test_accuracies(losses, show)
   elif script =='compare_batch_training':
     compare_batch_training(losses, show)
-  elif script == 'adult_push':
-    adult_push(losses, show)
   elif script in ["precision", "losses", "push", "reg"]:
     SR = Script_Master(script, losses, data, num_examples, max_time, seeds, hls, bounds, regs, show=show)
     SR.run_all()
-    SR.plot_reg_results()
-    #SR.plot_all()
-    SR.subplot_results()
+    if script == "reg":
+      SR.plot_reg_results()
+    else:
+      #SR.plot_all()
+      SR.subplot_results()
   else:
     raise Exception("Script %s not known" % script)
   end = time()

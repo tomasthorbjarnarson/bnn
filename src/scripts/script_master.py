@@ -72,7 +72,11 @@ class Script_Master():
     self.max_time_left = len(self.losses)*len(num_examples)*len(seeds)*len(hls)*max_runtime
 
     for hl_key in self.json_names:
-      name = "Time:%s_HLs:%s_|S|:%s_|Prec|:%s" % (max_runtime, hl_key, len(seeds), len(bounds))
+      if len(bounds) == 1:
+        name = "Time:%s_HLs:%s_|S|:%s_Prec:%s" % (max_runtime, hl_key, len(seeds), self.bound)
+      else:
+        name = "Time:%s_HLs:%s_|S|:%s_|Prec|:%s" % (max_runtime, hl_key, len(seeds), len(bounds))
+
       for loss in self.losses:
         self.json_names[hl_key][loss] = "%s-%s" % (loss, name)
       self.plot_names[hl_key] = name
@@ -274,8 +278,8 @@ class Script_Master():
       handles, labels = axs[0].get_legend_handles_labels()
       axs[-1].axis('off')
       axs[-1].legend(handles, labels, loc='upper left')
-      
-      plot_dir = "%s/%s" % (self.plot_dir, setting)
+
+      plot_dir = "%s" % (self.plot_dir)
       pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
       file_name = self.plot_names[hl_key]
       title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
