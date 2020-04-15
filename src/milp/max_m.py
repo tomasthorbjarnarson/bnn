@@ -3,7 +3,7 @@ from milp.nn import NN
 from globals import EPSILON, CONT
 
 class MAX_M(NN):
-  def __init__(self, model, data, architecture, bound, reg):
+  def __init__(self, model, data, architecture, bound, reg, fair):
 
     self.N = len(data["train_x"])
     self.architecture = architecture
@@ -13,6 +13,7 @@ class MAX_M(NN):
 
     self.bound = bound
     self.reg = reg
+    self.fair = fair
 
     self.m = model
 

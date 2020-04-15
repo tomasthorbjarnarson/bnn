@@ -3,14 +3,10 @@ from milp.nn import NN
 from globals import BIN, TARGET_ERROR, MARGIN, EPSILON
 
 class SAT_MARGIN(NN):
-  def __init__(self, model, data, architecture, bound, reg):
+  def __init__(self, model, data, architecture, bound, reg, fair):
 
-    NN.__init__(self, model, data, architecture, bound, reg)
+    NN.__init__(self, model, data, architecture, bound, reg, fair)
 
-    if len(architecture) > 2:
-      self.out_bound = (self.architecture[-2]+1)*self.bound
-    else:
-      self.out_bound = np.mean(data['train_x'])*architecture[0]
     self.init_output()
     self.add_output_constraints()
     if reg:

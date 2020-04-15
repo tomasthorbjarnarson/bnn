@@ -105,6 +105,19 @@ def get_mean_vars(network_vars):
 
   return mean_vars
 
+def get_median_vars(network_vars):
+  """network_vars contains varMatrices of all batches"""
+  all_vars = {}
+  mean_vars = {}
+  for key in network_vars[0]:
+    all_vars[key] = np.stack([tmp[key] for tmp in network_vars])
+    mean_vars[key] = np.median(all_vars[key], axis=0)
+    mean_vars[key][mean_vars[key] < 0] -= 1e-5
+    mean_vars[key][mean_vars[key] >= 0] += 1e-5
+    mean_vars[key] = np.round(mean_vars[key])
+
+  return mean_vars
+
 def clear_print(text):
   print("====================================")
   print(text)

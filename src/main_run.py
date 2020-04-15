@@ -5,11 +5,14 @@ from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
 from milp.max_m import MAX_M
-from helper.misc import infer_and_accuracy, clear_print, get_bound_matrix,get_mean_vars,get_network_size,strip_network
+from helper.misc import inference, infer_and_accuracy, clear_print, get_bound_matrix, \
+                        get_mean_vars,get_median_vars, get_network_size,strip_network
 from helper.data import load_data, get_batches, get_architecture
 from helper.save_data import DataSaver
+from helper.fairness import equalized_odds, demographic_parity
 import argparse
 import numpy as np
+import time
 from pdb import set_trace
 
 milps = {
@@ -39,7 +42,7 @@ if __name__ == '__main__':
   parser.add_argument('--data', default="mnist", type=str)
   parser.add_argument('--bound', default=1, type=int)
   parser.add_argument('--batch', default=0, type=int)
-  #parser.add_argument('--reg', action='store_true', help="An optional flag to regularize network")
+  parser.add_argument('--fair', default="", type=str)
   parser.add_argument('--reg', default=0, type=float)
   parser.add_argument('--save', action='store_true', help="An optional flag to save data")
   parser.add_argument('--all', action='store_true', help="An optional flag to run on all data")
@@ -58,6 +61,7 @@ if __name__ == '__main__':
   bound = args.bound
   batch_size = args.batch
   reg = args.reg
+  fair = args.fair
 
   print(args)
 
@@ -83,11 +87,13 @@ if __name__ == '__main__':
   networks = []
   network_vars = []
 
+  time_start = time.time()
+
   ### RUN BATCHES
   batch_num = 0
   for batch in batches:
     clear_print("Batch: %s. Examples: %s-%s" % (batch_num, batch_num*batch_size, (batch_num+1)*batch_size))
-    nn = get_nn(milps[loss], batch, architecture, bound, reg)
+    nn = get_nn(milps[loss], batch, architecture, bound, reg, fair)
     nn.train(train_time*60, focus)
 
     obj = nn.get_objective()
@@ -108,12 +114,12 @@ if __name__ == '__main__':
 
 
   ### RUN ALL TOGETHER FROM BATCHES WARM START
-  if batch_size > 0 and batch_size != N:
+  if batch_size > 0 and batch_size != N and not args.mean:
     clear_print("Using warm start from batches")
     bound_matrix = get_bound_matrix(network_vars, bound)
     #bound_matrix = get_alt_bound_matrix(network_vars, bound)
 
-    warm_nn = get_nn(milps[loss], data, architecture, bound)
+    warm_nn = get_nn(milps[loss], data, architecture, bound, reg, fair)
     #warm_nn.warm_start(get_mean_vars(network_vars))
     warm_nn.update_bounds(bound_matrix)
     warm_nn.train(train_time*60, focus)
@@ -136,7 +142,7 @@ if __name__ == '__main__':
   ### RUN ALL DATA AT ONCE
   if args.all:
     clear_print("All data at once")
-    nn = get_nn(milps[loss], data, architecture, bound)
+    nn = get_nn(milps[loss], data, architecture, bound, reg, fair)
     nn.train(train_time*60, focus)
 
     obj = nn.get_objective()
@@ -155,6 +161,9 @@ if __name__ == '__main__':
 
   ### TAKE MEAN VARIABLES AND RUN INFERENCE
   if args.mean:
+    time_end = time.time()
+    total_time = time_end - time_start
+
     mean_vars = get_mean_vars(network_vars)
 
     train_acc = infer_and_accuracy(nn.data['train_x'], nn.data["train_y"], mean_vars, nn.architecture)
@@ -162,6 +171,7 @@ if __name__ == '__main__':
 
     clear_print("Training accuracy for mean parameters: %s" % (train_acc))
     clear_print("Testing accuracy for mean parameters: %s" % (test_acc))
+    clear_print("Time to run all batches: %.2f" % (total_time))
 
   w1 = varMatrices['w_1']
   b1 = varMatrices['b_1']
@@ -189,6 +199,53 @@ if __name__ == '__main__':
 
   print("Stripped Training accuracy: %s " % (stripped_train_acc))
   print("Stripped Testing accuracy: %s " % (stripped_test_acc))
+
+  female_train = data['train_x'][:,64]
+  male_train = data['train_x'][:,65]
+  labels_train = np.array(inference(data['train_x'], varMatrices, architecture))
+  female_perc_train = (female_train*labels_train).sum() / labels_train.sum()
+  print("female_perc_train", female_perc_train)
+  male_perc_train = (male_train*labels_train).sum() / labels_train.sum()
+  print("male_perc_train", male_perc_train)
+
+  female_test = data['test_x'][:,64]
+  male_test = data['test_x'][:,65]
+  labels_test = np.array(inference(data['test_x'], varMatrices, architecture))
+
+  if fair == "EO":
+
+    clear_print("Equalized Odds:")
+
+    tr_p111, tr_p101, tr_p110, tr_p100 = equalized_odds(data['train_x'], labels_train, data['train_y'])
+    
+    print("train_p111: %.3f" % (tr_p111))
+    print("train_p101: %.3f" % (tr_p101))
+    print("train_p110: %.3f" % (tr_p110))
+    print("train_p100: %.3f" % (tr_p100))
+    p111, p101, p110, p100 = equalized_odds(data['test_x'], labels_test, data['test_y'])
+
+    print("test_p111: %.3f" % (p111))
+    print("test_p101: %.3f" % (p101))
+    print("test_p110: %.3f" % (p110))
+    print("test_p100: %.3f" % (p100))
+
+    print("NN p111: %.3f" % (nn.female_pred1_true1.getValue()))
+    print("NN p101: %.3f" % (nn.male_pred1_true1.getValue()))
+    print("NN p110: %.3f" % (nn.female_pred1_true0.getValue()))
+    print("NN p100: %.3f" % (nn.male_pred1_true0.getValue()))
+
+  elif fair == "DP":
+
+    clear_print("Demographic Parity:")
+
+    tr_p11, tr_p10 = demographic_parity(data['train_x'], labels_train, data['train_y'])
+    print("train_p11: %.3f" % (tr_p11))
+    print("train_p10: %.3f" % (tr_p10))
+
+    p11, p10 = demographic_parity(data['test_x'], labels_test, data['test_y'])
+    print("test_p11: %.3f" % (p11))
+    print("test_p10: %.3f" % (p10))
+
   set_trace()
 
   if args.save:

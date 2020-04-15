@@ -7,7 +7,7 @@ import numpy as np
 from globals import INT, BIN, CONT, EPSILON
 
 class NN:
-  def __init__(self, model, data, architecture, bound, reg):
+  def __init__(self, model, data, architecture, bound, reg, fair):
 
     self.N = len(data["train_x"])
     self.architecture = architecture
@@ -17,11 +17,19 @@ class NN:
 
     self.bound = bound
     self.reg = reg
+    self.fair = fair
 
     self.m = model
 
+    if len(architecture) > 2:
+      self.out_bound = (self.architecture[-2]+1)*self.bound
+    else:
+      self.out_bound = np.mean(data['train_x'])*architecture[0]
+
     self.init_params()
     self.add_examples()
+    if fair in ["EO", "DP"]:
+      self.add_fairness()
 
   def init_params(self):
     self.weights = {}
@@ -103,6 +111,61 @@ class NN:
         for n in range(self.architecture[layer+1]):
           self.add_constraint((self.H[layer][j] == 0) >> (self.weights[layer+1][j,n] == 0))
 
+  def add_fairness(self):
+    layer = len(self.architecture) - 1
+    lastLayer = layer - 1
+    neurons_in = self.architecture[lastLayer]
+    neurons_out = self.architecture[layer]
+
+    self.pred_labels = np.full(self.N, None)
+    for k in range(self.N):
+      self.pred_labels[k] = self.add_var(BIN, name="label_%s" % k)
+
+    females = self.data['train_x'][:,64]
+    males = self.data['train_x'][:,65]
+    labels = self.data['train_y']
+    false_labels = 1 - labels
+
+    for k in range(self.N):
+      pre_acts = 0
+      for j in range(neurons_out):
+        inputs = []
+        for i in range(neurons_in):
+          if layer == 1:
+            inputs.append(self.train_x[k,i]*self.weights[layer][i,j])
+          else:
+            inputs.append(self.var_c[layer][k,i,j])
+        pre_activation = sum(inputs) + self.biases[layer][j]
+        pre_activation = 2*pre_activation/self.out_bound
+
+        if j == 0:
+          pre_acts += pre_activation
+        else:
+          pre_acts -= pre_activation
+
+      self.add_constraint((self.pred_labels[k] == 0) >> (pre_acts >= 0))
+      self.add_constraint((self.pred_labels[k] == 1) >> (pre_acts <= 0))
+
+    if self.fair == "EO":
+      self.female_pred1_true1 = (females*labels*self.pred_labels).sum() / (females*labels).sum() 
+      self.male_pred1_true1 = (males*labels*self.pred_labels).sum() / (males*labels).sum()
+
+      self.female_pred1_true0 = (females*false_labels*self.pred_labels).sum() / (females*false_labels).sum() 
+      self.male_pred1_true0 = (males*false_labels*self.pred_labels).sum() / (males*false_labels).sum()
+
+      fair_constraint = 0.01
+      self.add_constraint(self.female_pred1_true1 - self.male_pred1_true1 <= fair_constraint)
+      self.add_constraint(self.female_pred1_true1 - self.male_pred1_true1 >= -fair_constraint)
+      self.add_constraint(self.female_pred1_true0 - self.male_pred1_true0 <= fair_constraint)
+      self.add_constraint(self.female_pred1_true0 - self.male_pred1_true0 >= -fair_constraint)
+    elif self.fair == "DP":
+      self.female_pred1 = (females*self.pred_labels).sum() / females.sum() 
+      self.male_pred1 = (males*self.pred_labels).sum() / males.sum()
+
+      fair_constraint = 0.1
+      self.add_constraint(self.female_pred1 - self.male_pred1 <= fair_constraint)
+      self.add_constraint(self.female_pred1 - self.male_pred1 >= -fair_constraint)
+
   def update_bounds(self, bound_matrix={}):
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
       layer = lastLayer + 1
@@ -169,6 +232,9 @@ class NN:
         varMatrices["c_%s" %layer] = self.get_val(self.var_c[layer], get_func)
       if layer < len(self.architecture) - 1:
         varMatrices["act_%s" %layer] = self.get_val(self.act[layer], get_func)
+
+    if self.fair in ["EO", "DP"]:
+      varMatrices["pred_labels"] = self.get_val(self.pred_labels, get_func)
 
     return varMatrices
 

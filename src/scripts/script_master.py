@@ -8,6 +8,7 @@ from helper.misc import infer_and_accuracy, clear_print
 from helper.data import load_data, get_architecture
 from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
+from milp.max_m import MAX_M
 from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
@@ -17,6 +18,7 @@ focus = 1
 
 milps = {
   "min_w": MIN_W,
+  "max_m": MAX_M,
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
   "sat_margin": SAT_MARGIN
@@ -44,7 +46,7 @@ class Script_Master():
     self.regs = regs
     if len(bounds) == 1:
       self.bound = bounds[0]
-    if len(losses) == 1 and len(bounds) > 1:
+    elif len(losses) == 1 and len(bounds) > 1:
       self.losses = []
       for bound in bounds:
         self.losses.append("%s-bound=%s" % (losses[0], bound))
@@ -256,7 +258,7 @@ class Script_Master():
     markers = ['o', 'v', '+', '*', 'P', '^', 'v'][0:len(self.losses)]
     j = 0
     for hl_key in self.results:
-      fig, axs = plt.subplots(2,2)
+      fig, axs = plt.subplots(2,2, figsize=(12,10))
       axs = axs.flatten()
       for setting in settings:
         colors = sns.color_palette("husl", len(self.losses))
@@ -266,7 +268,7 @@ class Script_Master():
           x = self.results[hl_key][loss]["HL"]
           y = list(self.results[hl_key][loss][setting].values())
           axs[j].scatter(x,y, label=get_reg_label(reg), color=colors[i], marker=markers[i])
-          if reg == 0:
+          if reg == 0 and setting == "test_accs":
             x = [0,np.max(x)]
             y = [np.min(y),np.min(y)]
             axs[j].plot(x,y, color=colors[i], linestyle="--")

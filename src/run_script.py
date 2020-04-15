@@ -48,7 +48,7 @@ if __name__ == '__main__':
     num_examples = [200]
     max_time = 24*60
     bounds = [15]
-    regs = [0, -1, 1, 0.1, 0.01]
+    regs = [0, -1, 1, 0.1]
     if short:
       hls = [[30]]
       num_examples = [100]

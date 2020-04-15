@@ -10,14 +10,14 @@ vtypes = {
   CONT: GRB.CONTINUOUS
 }
 
-def get_gurobi_nn(NN, data, architecture, bound, reg=False):
+def get_gurobi_nn(NN, data, architecture, bound, reg=False, fair=""):
   # Init a NN using Gurobi API according to the NN supplied
   class Gurobi_NN(NN):
-    def __init__(self, data, architecture, bound, reg):
+    def __init__(self, data, architecture, bound, reg, fair):
       model = gp.Model("Gurobi_NN")
       if not LOG:
         model.setParam("OutputFlag", 0)
-      NN.__init__(self, model, data, architecture, bound, reg)
+      NN.__init__(self, model, data, architecture, bound, reg, fair)
       
     def add_var(self, precision, name, bound=None, lb=None, ub=None):
       if precision not in vtypes:
@@ -101,7 +101,7 @@ def get_gurobi_nn(NN, data, architecture, bound, reg=False):
           tmp[index] = 0
       return tmp
 
-  return Gurobi_NN(data, architecture, bound, reg)
+  return Gurobi_NN(data, architecture, bound, reg, fair)
 
 
 def mycallback(model, where):
