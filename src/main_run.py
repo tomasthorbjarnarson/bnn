@@ -200,17 +200,18 @@ if __name__ == '__main__':
   print("Stripped Training accuracy: %s " % (stripped_train_acc))
   print("Stripped Testing accuracy: %s " % (stripped_test_acc))
 
-  female_train = data['train_x'][:,64]
-  male_train = data['train_x'][:,65]
-  labels_train = np.array(inference(data['train_x'], varMatrices, architecture))
-  female_perc_train = (female_train*labels_train).sum() / labels_train.sum()
-  print("female_perc_train", female_perc_train)
-  male_perc_train = (male_train*labels_train).sum() / labels_train.sum()
-  print("male_perc_train", male_perc_train)
+  if fair:
+    female_train = data['train_x'][:,64]
+    male_train = data['train_x'][:,65]
+    labels_train = np.array(inference(data['train_x'], varMatrices, architecture))
+    female_perc_train = (female_train*labels_train).sum() / labels_train.sum()
+    print("female_perc_train", female_perc_train)
+    male_perc_train = (male_train*labels_train).sum() / labels_train.sum()
+    print("male_perc_train", male_perc_train)
 
-  female_test = data['test_x'][:,64]
-  male_test = data['test_x'][:,65]
-  labels_test = np.array(inference(data['test_x'], varMatrices, architecture))
+    female_test = data['test_x'][:,64]
+    male_test = data['test_x'][:,65]
+    labels_test = np.array(inference(data['test_x'], varMatrices, architecture))
 
   if fair == "EO":
 

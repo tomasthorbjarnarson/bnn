@@ -72,8 +72,8 @@ if __name__ == '__main__':
     if script == "reg":
       SR.plot_reg_results()
     else:
-      #SR.plot_all()
-      SR.subplot_results()
+      SR.plot_all()
+      #SR.subplot_results()
   else:
     raise Exception("Script %s not known" % script)
   end = time()

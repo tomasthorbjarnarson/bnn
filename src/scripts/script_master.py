@@ -28,6 +28,11 @@ gds = {
   "gd_nn": GD_NN
 }
 
+#add_prec = lambda x: ["%s-%s" % (x,i) for i in [1,3,7,15,31]]
+#all_possible_losses = [add_prec(loss) for loss in list(milps.keys())+list(gds.keys())]
+colors = sns.color_palette("husl", len(milps) + len(gds))
+loss_colors = dict(zip(list(milps.keys())+list(gds.keys()), colors))
+
 
 class Script_Master():
   def __init__(self, script_name, losses, dataset, num_examples, max_runtime,
@@ -44,17 +49,34 @@ class Script_Master():
     self.seeds = seeds
     self.bounds = bounds
     self.regs = regs
+    self.loss_colors = loss_colors
+
+    ok = False
     if len(bounds) == 1:
       self.bound = bounds[0]
-    elif len(losses) == 1 and len(bounds) > 1:
+      ok = True
+    if len(losses) == 1 and len(bounds) > 1:
       self.losses = []
+      new_colors = sns.color_palette("husl", len(colors)+len(bounds))
+      i = len(colors)
       for bound in bounds:
-        self.losses.append("%s-bound=%s" % (losses[0], bound))
-    elif len(losses) == 1 and len(regs) > 0:
+        loss_name = "%s-bound=%s" % (losses[0], bound)
+        self.losses.append(loss_name)
+        self.loss_colors[loss_name] = new_colors[i]
+        i += 1
+      ok = True
+    if len(losses) == 1 and len(regs) > 0:
+      self.bound = bounds[0]
       self.losses = []
+      new_colors = sns.color_palette("husl", len(colors)+len(regs))
+      i = len(colors)
       for reg in regs:
-        self.losses.append("%s-reg=%s" % (losses[0],reg))
-    else:
+        loss_name = "%s-reg=%s" % (losses[0],reg)
+        self.losses.append(loss_name)
+        self.loss_colors[loss_name] = new_colors[i]
+        i += 1
+      ok = True
+    if not ok:
       raise Exception("Losses %s, Bounds %s and Regs %s incompatible" % (losses,bounds,regs))
 
     self.lr = lr
@@ -98,6 +120,7 @@ class Script_Master():
           with open(json_path, "r") as f:
             data = json.loads(f.read())
             self.results[hl_key][loss] = data["results"]
+          self.max_time_left -= len(self.seeds)*self.max_runtime
         else:
           self.run_experiment(hl_key, loss)
           with open(json_path, "w") as f:
@@ -187,17 +210,17 @@ class Script_Master():
 
   def plot_results(self, hl_key, setting, index):
     plt.figure(index)
-    colors = sns.color_palette("husl", len(self.losses))
+    sns.set_style("darkgrid")
     for i,loss in enumerate(self.losses):
       x = [int(z) for z in self.results[hl_key][loss][setting].keys()]
       y, err = get_mean_std(self.results[hl_key][loss][setting].values())
-      plt.plot(x,y, label=loss, color = colors[i])
-      plt.fill_between(x, y - err, y + err, alpha=0.3, facecolor=colors[i])
+      plt.plot(x,y, label=loss, color = loss_colors[loss])
+      plt.fill_between(x, y - err, y + err, alpha=0.3, facecolor=loss_colors[loss])
 
     if len(self.bounds) == 1:
-      title = "%s for %s dataset with bound %s" % (titles[setting], self.dataset, self.bound)
+      title = "%s for %s dataset with bound %s" % (self.get_plot_title(setting), self.dataset, self.bound)
     else:
-      title = "%s for %s dataset with different bounds" % (titles[setting], self.dataset)
+      title = "%s for %s dataset with different bounds" % (self.get_plot_title(setting), self.dataset)
 
     plt.legend()
     plt.xlabel("Number of examples")
@@ -221,12 +244,11 @@ class Script_Master():
       fig, axs = plt.subplots(2,2)
       axs = axs.flatten()
       for setting in settings:
-        colors = sns.color_palette("husl", len(self.losses))
         for i,loss in enumerate(self.losses):
           x = [int(z) for z in self.results[hl_key][loss][setting].keys()]
           y, err = get_mean_std(self.results[hl_key][loss][setting].values())
-          axs[j].plot(x,y, label=loss, color = colors[i])
-          axs[j].fill_between(x, y - err, y + err, alpha=0.3, facecolor=colors[i])
+          axs[j].plot(x,y, label=loss, color = loss_colors[loss])
+          axs[j].fill_between(x, y - err, y + err, alpha=0.3, facecolor=loss_colors[loss])
         axs[j].set_xlabel("Number of examples")
         axs[j].set_ylabel(self.get_plot_ylabel(setting))
         axs[j].set_title(self.get_plot_title(setting))
@@ -261,17 +283,16 @@ class Script_Master():
       fig, axs = plt.subplots(2,2, figsize=(12,10))
       axs = axs.flatten()
       for setting in settings:
-        colors = sns.color_palette("husl", len(self.losses))
         for i,loss in enumerate(self.losses):
           _,reg = loss.split("-reg=")
           reg = float(reg)
           x = self.results[hl_key][loss]["HL"]
           y = list(self.results[hl_key][loss][setting].values())
-          axs[j].scatter(x,y, label=get_reg_label(reg), color=colors[i], marker=markers[i])
+          axs[j].scatter(x,y, label=get_reg_label(reg), color=loss_colors[loss], marker=markers[i])
           if reg == 0 and setting == "test_accs":
             x = [0,np.max(x)]
             y = [np.min(y),np.min(y)]
-            axs[j].plot(x,y, color=colors[i], linestyle="--")
+            axs[j].plot(x,y, color=loss_colors[loss], linestyle="--")
         axs[j].set_xlabel("Number of neurons in hidden layer(s)")
         axs[j].set_ylabel(self.get_plot_ylabel(setting))
         axs[j].set_title(self.get_plot_title(setting))
@@ -320,9 +341,15 @@ class Script_Master():
     ylims = {
       "train_accs": [0,100],
       "test_accs": [0,100],
-      "runtimes": [0, self.max_runtime*60]
+      "runtimes": [0, (self.max_runtime+2*60)*60]
     }
     return ylims[setting]
+
+  def get_loss_color(self, loss):
+    colors = {
+
+    }
+
 
 def get_mean_std(results):
   mean = np.array([np.mean(z) for z in results])

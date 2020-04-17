@@ -12,6 +12,7 @@ class GD_NN:
     self.sess = tf.Session()
     self.lr = lr
     self.bound = bound
+    self.architecture = architecture
 
     self.cutoff = N*TARGET_ERROR*MARGIN*MARGIN
     print("cutoff", self.cutoff)

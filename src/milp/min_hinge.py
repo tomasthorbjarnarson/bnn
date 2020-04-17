@@ -44,7 +44,7 @@ class MIN_HINGE(NN):
   def calc_objective(self):
     def hinge(u):
       return np.square(np.maximum(0, (MARGIN - u)))
-    npts = 2*self.out_bound+1
+    npts = int(2*self.out_bound+1)
     lb = -1
     ub = 1
     ptu = []
