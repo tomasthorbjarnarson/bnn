@@ -4,8 +4,9 @@ import pathlib
 import json
 import seaborn as sns
 from datetime import datetime
-from helper.misc import infer_and_accuracy, clear_print
+from helper.misc import infer_and_accuracy, clear_print, inference
 from helper.data import load_data, get_architecture
+from helper.fairness import equalized_odds, demographic_parity
 from milp.gurobi_nn import get_gurobi_nn
 from milp.min_w import MIN_W
 from milp.max_m import MAX_M
@@ -36,7 +37,7 @@ loss_colors = dict(zip(list(milps.keys())+list(gds.keys()), colors))
 
 class Script_Master():
   def __init__(self, script_name, losses, dataset, num_examples, max_runtime,
-               seeds, hls, bounds, regs=[], lr=1e-3, show=True):
+               seeds, hls, bounds, regs=[], fair=False, lr=1e-3, show=True):
     self.script_name = script_name
     self.losses = losses
     for loss in self.losses:
@@ -57,8 +58,8 @@ class Script_Master():
       ok = True
     if len(losses) == 1 and len(bounds) > 1:
       self.losses = []
-      new_colors = sns.color_palette("husl", len(colors)+len(bounds))
-      i = len(colors)
+      new_colors = sns.color_palette("bright", len(bounds))
+      i = 0
       for bound in bounds:
         loss_name = "%s-bound=%s" % (losses[0], bound)
         self.losses.append(loss_name)
@@ -68,14 +69,26 @@ class Script_Master():
     if len(losses) == 1 and len(regs) > 0:
       self.bound = bounds[0]
       self.losses = []
-      new_colors = sns.color_palette("husl", len(colors)+len(regs))
-      i = len(colors)
+      new_colors = sns.color_palette("bright", len(regs))
+      i = 0
       for reg in regs:
         loss_name = "%s-reg=%s" % (losses[0],reg)
         self.losses.append(loss_name)
         self.loss_colors[loss_name] = new_colors[i]
         i += 1
       ok = True
+    if len(losses) == 1 and fair:
+      self.bound = bounds[0]
+      self.losses = []
+      new_colors = sns.color_palette("bright", 3)
+      i = 0
+      for f in ["", "EO", "DP"]:
+        loss_name = "%s-fair=%s" % (losses[0], f)
+        self.losses.append(loss_name)
+        self.loss_colors[loss_name] = new_colors[i]
+        i += 1
+
+
     if not ok:
       raise Exception("Losses %s, Bounds %s and Regs %s incompatible" % (losses,bounds,regs))
 
@@ -156,6 +169,12 @@ class Script_Master():
       reg = float(reg)
     else:
       reg = 0
+
+    if "-fair=" in og_loss:
+      loss, fair = og_loss.split("-fair=")
+    else:
+      fair = ""
+
     # Make a copy
     num_examples = list(self.num_examples)
     for N in num_examples:
@@ -165,14 +184,18 @@ class Script_Master():
       nn_results["runtimes"][N] = []
       nn_results["objs"][N] = []
       nn_results["HL"] = []
+      nn_results["train_EO"] = []
+      nn_results["test_EO"] = []
+      nn_results["train_DP"] = []
+      nn_results["test_DP"] = []
       optimal_reached = []
       self.print_max_time_left()
       for s in self.seeds:
-        clear_print("%s:  HLs: %s. N: %s. Seed: %s. Bound: %s. Reg: %s" % (loss, hl_key, N, s, bound, reg))
+        clear_print("%s:  HLs: %s. N: %s. Seed: %s. Bound: %s. Reg: %s. Fair: %s" % (loss, hl_key, N, s, bound, reg, fair))
         data = load_data(self.dataset, N, s)
         arch = get_architecture(data, self.hls[hl_key])
         if loss in milps:
-          nn = get_gurobi_nn(milps[loss], data, arch, bound, reg)
+          nn = get_gurobi_nn(milps[loss], data, arch, bound, reg, fair)
           nn.train(60*self.max_runtime, focus)
         else:
           nn = GD_NN(data, N, arch, self.lr, bound, s)
@@ -198,6 +221,20 @@ class Script_Master():
           nn_results["HL"].append(sum(hl))
         else:
           nn_results["HL"].append(sum(arch[1:-1]))
+
+        labels_train = np.array(inference(data['train_x'], varMatrices, arch))
+        labels_test = np.array(inference(data['test_x'], varMatrices, arch))
+        tr_p111, tr_p101, tr_p110, tr_p100 = equalized_odds(data['train_x'], labels_train, data['train_y'])
+        tst_p111, tst_p101, tst_p110, tst_p100 = equalized_odds(data['test_x'], labels_test, data['test_y'])
+
+        nn_results["train_EO"].append({'p111': tr_p111, 'p101': tr_p101, 'p110': tr_p110, 'p100': tr_p100})
+        nn_results["test_EO"].append({'p111': tst_p111, 'p101': tst_p101, 'p110': tst_p110, 'p100': tst_p100})
+
+        tr_p11, tr_p10 = demographic_parity(data['train_x'], labels_train, data['train_y'])
+        tst_p11, tst_p10 = demographic_parity(data['test_x'], labels_test, data['test_y'])
+
+        nn_results["train_DP"].append({'p11': tr_p11, 'p10': tr_p10})
+        nn_results["test_DP"].append({'p11': tst_p11, 'p10': tst_p10})
 
         self.max_time_left -= self.max_runtime
 
@@ -271,45 +308,104 @@ class Script_Master():
   def plot_reg_results(self):
     def get_reg_label(reg):
       if reg == 0:
-        return "No regularization"
+        return "No architecture optimization"
       elif reg == -1:
-        return "Hierarchical regularization"
+        return "Hierarchical optimization"
       else:
-        return "Weighted regularization, alpha=%s" % reg
+        return "Weighted optimization, alpha=%s" % reg
     settings = ["train_accs", "test_accs", "runtimes"]
     markers = ['o', 'v', '+', '*', 'P', '^', 'v'][0:len(self.losses)]
     j = 0
+    sns.set_style("darkgrid")
+
     for hl_key in self.results:
-      fig, axs = plt.subplots(2,2, figsize=(12,10))
-      axs = axs.flatten()
+      #fig, axs = plt.subplots(2,2, figsize=(12,10))
+      #axs = axs.flatten()
       for setting in settings:
+        plt.figure(j)
         for i,loss in enumerate(self.losses):
           _,reg = loss.split("-reg=")
           reg = float(reg)
           x = self.results[hl_key][loss]["HL"]
           y = list(self.results[hl_key][loss][setting].values())
-          axs[j].scatter(x,y, label=get_reg_label(reg), color=loss_colors[loss], marker=markers[i])
-          if reg == 0 and setting == "test_accs":
-            x = [0,np.max(x)]
-            y = [np.min(y),np.min(y)]
-            axs[j].plot(x,y, color=loss_colors[loss], linestyle="--")
-        axs[j].set_xlabel("Number of neurons in hidden layer(s)")
-        axs[j].set_ylabel(self.get_plot_ylabel(setting))
-        axs[j].set_title(self.get_plot_title(setting))
-        axs[j].set_ylim(self.get_plot_ylim(setting))
-        j += 1
-      handles, labels = axs[0].get_legend_handles_labels()
-      axs[-1].axis('off')
-      axs[-1].legend(handles, labels, loc='upper left')
+          #axs[j].scatter(x,y, label=get_reg_label(reg), color=loss_colors[loss], marker=markers[i])
+          plt.scatter(x,y, label=get_reg_label(reg), color=loss_colors[loss], marker=markers[i])
+          #if reg == 0 and setting == "test_accs":
+          #  x = [0,np.max(x)]
+          #  y = [np.min(y),np.min(y)]
+          #  #axs[j].plot(x,y, color=loss_colors[loss], linestyle="--")
+          #  plt.plot(x,y, color=loss_colors[loss], linestyle="--")
+        #axs[j].set_xlabel("Number of neurons in hidden layer(s)")
+        #axs[j].set_ylabel(self.get_plot_ylabel(setting))
+        #axs[j].set_title(self.get_plot_title(setting))
+        #axs[j].set_ylim(self.get_plot_ylim(setting))
+        plt.xlabel("Number of neurons in hidden layer(s)")
+        plt.ylabel(self.get_plot_ylabel(setting))
+        plt.title(self.get_plot_title(setting))
+        plt.ylim(self.get_plot_ylim(setting))
+        plt.legend(labels=[get_reg_label(0), get_reg_label(-1), get_reg_label(1), get_reg_label(0.1)])
 
-      plot_dir = "%s" % (self.plot_dir)
-      pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
-      file_name = self.plot_names[hl_key]
-      title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
-      if self.show:
-        plt.show()
-      else:
-        plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
+        j += 1
+      #handles, labels = axs[0].get_legend_handles_labels()
+      #handles, labels = plt.get_legend_handles_labels()
+      #axs[-1].axis('off')
+      #axs[-1].legend(handles, labels, loc='upper left')
+      #plot_dir = "%s" % (self.plot_dir)
+        plot_dir = "%s/%s" % (self.plot_dir, setting)
+        pathlib.Path(plot_dir).mkdir(parents=True, exist_ok=True)
+        file_name = self.plot_names[hl_key]
+        title = "%s_TS:%s" % (file_name, datetime.now().strftime("%d-%m-%H:%M"))
+        if self.show:
+          plt.show()
+        else:
+          plt.savefig("%s/%s.png" % (plot_dir,title),  bbox_inches='tight')
+
+  def visualize_fairness(self, fair_type):
+    small_between = "----------\n"
+    between = "===============\n"
+    EO_str = "P111: {p111:.3f}. P101: {p101:.3f}. P110: {p100:.3f}. P100: {p100:.3f}.\n"
+    DP_str = "P11: {p11:.3f}. P10: {p10:.3f}.\n"
+    if fair_type == "EO":
+      format_str = EO_str
+    elif fair_type == "DP":
+      format_str = DP_str
+    else:
+      raise Exception("Unkown fairness definition: %s" % fair_type)
+    print_str = between
+    for hl_key in self.results:
+      for i,loss in enumerate(self.losses):
+        _,fair = loss.split("-fair=")
+        if fair == fair_type or fair == "":
+          loss_result = self.results[hl_key][loss]
+          ex = self.num_examples[0]
+          if str(ex) in loss_result["train_accs"]:
+            ex = str(ex)
+          train = np.mean(loss_result["train_accs"][ex])
+          train_std = np.std(loss_result["train_accs"][ex])
+          test = np.mean(loss_result["test_accs"][ex])
+          test_std = np.std(loss_result["test_accs"][ex])
+          run = np.mean(loss_result["runtimes"][ex])
+          run_std = np.std(loss_result["runtimes"][ex])
+          print_str += "Fairness definition: %s.\n" % fair
+          print_str += "Train acc: %.3f +/- %.3f.\n" % (train, train_std)
+          print_str += "Test acc: %.3f +/- %.3f.\n" % (test, test_std)
+          print_str += "Runtime: %.3f +/- %.3f.\n" % (run, run_std)
+          print_str += small_between
+
+          train_fair = self.results[hl_key][loss]["train_%s" % fair_type]
+          test_fair = self.results[hl_key][loss]["test_%s" % fair_type]
+          for j, seed in enumerate(self.seeds):
+            print_str += "Seed: %s.\n" % seed
+            print_str += "Train: " + format_str.format(**train_fair[j])
+            print_str += "Test: " + format_str.format(**test_fair[j])
+            if j != len(self.seeds)-1:
+              print_str += small_between
+          print_str += between
+
+    print(print_str)
+
+
+
 
   def print_max_time_left(self):
     time_left = self.max_time_left
@@ -339,19 +435,44 @@ class Script_Master():
 
   def get_plot_ylim(self, setting):
     ylims = {
-      "train_accs": [0,100],
-      "test_accs": [0,100],
+      "train_accs": [0,105],
+      "test_accs": [0,105],
       "runtimes": [0, (self.max_runtime+2*60)*60]
     }
     return ylims[setting]
-
-  def get_loss_color(self, loss):
-    colors = {
-
-    }
-
 
 def get_mean_std(results):
   mean = np.array([np.mean(z) for z in results])
   std = np.array([np.std(z) for z in results])
   return mean, std
+
+
+
+    #ratio = 8
+    #f, (ax,ax2) = plt.subplots(2,1,gridspec_kw={'height_ratios': [ratio, 1]})
+
+    #plt.subplots_adjust(wspace=0, hspace=0)
+      #if setting in ['test_accs']:
+      #  ax.plot(x,y, label=loss, color = loss_colors[loss])
+      #  ax2.plot(x,y, label=loss, color = loss_colors[loss])
+      #  ax.fill_between(x, y - err, y + err, alpha=0.3, facecolor=loss_colors[loss])
+      #  ax2.fill_between(x, y - err, y + err, alpha=0.3, facecolor=loss_colors[loss])
+      #  ax.set_ylim(60,100)
+      #  ax2.set_ylim(0,5)
+      #  ax2.set_yticks([0,5])
+      #  ax.spines['bottom'].set_visible(False)
+      #  ax2.spines['top'].set_visible(False)
+      #  ax.xaxis.tick_top()
+      #  ax.tick_params(labeltop=False)  # don't put tick labels at the top
+      #  ax2.xaxis.tick_bottom()
+      #  d = 0.015
+      #  kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
+      #  #break_x = np.array([0,0,0.01,-0.01,0.01,-0.01,0,0])+0.01
+      #  #break_y = np.array([0,0.03,0.06,0.09,0.12,0.15,0.18,0.21])
+      #  #ax.plot(break_x, break_y, **kwargs)
+      #  ax.plot((-d, +d), (-d, +d), **kwargs) # top-left diagonal
+      #  ax.plot((1 - d, 1 + d), (-d, +d), **kwargs) # top-right diagonal
+      #  kwargs.update(transform=ax2.transAxes)
+      #  tmp = 1
+      #  ax2.plot((-d, +d), (1 - ratio*d, 1 + ratio*d), **kwargs) # bottom-left diagonal
+      #  ax2.plot((1 - d, 1 + d), (1 - ratio*d, 1 + ratio*d), **kwargs) # bottom-right diagonal

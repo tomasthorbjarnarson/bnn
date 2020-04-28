@@ -22,6 +22,7 @@ if __name__ == '__main__':
   print("show", show)
   losses = args.losses.split(",")
 
+  fair = False
   max_time = 10*60
   seeds = [1348612,7864568,9434861]
   hls = [[16]]
@@ -53,11 +54,17 @@ if __name__ == '__main__':
       hls = [[30]]
       num_examples = [100]
       regs = [0, -1, 0.1]
+  elif script == "fair":
+    fair = True
+    num_examples = [300]
+    bounds = [15]
+    if short:
+      num_examples = [200]
 
   if short:
     num_examples = num_examples[0:3]
     seeds = seeds[0:2]
-    max_time = 2
+    max_time = 10
 
   start = time()
   if script == 'compare_gurobi_cplex':
@@ -66,11 +73,14 @@ if __name__ == '__main__':
     compare_test_accuracies(losses, show)
   elif script =='compare_batch_training':
     compare_batch_training(losses, show)
-  elif script in ["precision", "losses", "push", "reg"]:
-    SR = Script_Master(script, losses, data, num_examples, max_time, seeds, hls, bounds, regs, show=show)
+  elif script in ["precision", "losses", "push", "reg", "fair"]:
+    SR = Script_Master(script, losses, data, num_examples, max_time, seeds, hls, bounds, regs, fair=fair, show=show)
     SR.run_all()
     if script == "reg":
       SR.plot_reg_results()
+    elif script == "fair":
+      SR.visualize_fairness("EO")
+      SR.visualize_fairness("DP")
     else:
       SR.plot_all()
       #SR.subplot_results()

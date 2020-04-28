@@ -153,7 +153,7 @@ class NN:
       self.female_pred1_true0 = (females*false_labels*self.pred_labels).sum() / (females*false_labels).sum() 
       self.male_pred1_true0 = (males*false_labels*self.pred_labels).sum() / (males*false_labels).sum()
 
-      fair_constraint = 0.01
+      fair_constraint = 0.05
       self.add_constraint(self.female_pred1_true1 - self.male_pred1_true1 <= fair_constraint)
       self.add_constraint(self.female_pred1_true1 - self.male_pred1_true1 >= -fair_constraint)
       self.add_constraint(self.female_pred1_true0 - self.male_pred1_true0 <= fair_constraint)
@@ -162,7 +162,7 @@ class NN:
       self.female_pred1 = (females*self.pred_labels).sum() / females.sum() 
       self.male_pred1 = (males*self.pred_labels).sum() / males.sum()
 
-      fair_constraint = 0.1
+      fair_constraint = 0.05
       self.add_constraint(self.female_pred1 - self.male_pred1 <= fair_constraint)
       self.add_constraint(self.female_pred1 - self.male_pred1 >= -fair_constraint)
 
