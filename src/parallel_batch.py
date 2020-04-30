@@ -45,6 +45,9 @@ class Batch_Runner:
     self.bound = bound
     self.reg = reg
     self.fair = fair
+    self.num_processes = len(os.sched_getaffinity(0))//2
+    print("Number of processes to run on: %s." % self.num_processes)
+
 
   def run_batch(self, batch, bound_matrix, batch_num):
     nn = get_nn(milps[self.loss], batch, self.architecture, self.bound, self.reg, self.fair)
@@ -53,15 +56,14 @@ class Batch_Runner:
     nn.train(train_time*60, focus)
     runtime = nn.get_runtime()
     varMatrices = nn.extract_values()
-    printProgressBar(batch_num, self.num_batches)
+    printProgressBar(batch_num+1, self.num_batches)
 
     return runtime, varMatrices
 
   def run_batches(self, batches, bound_matrix):
     batch_start = time.time()    
 
-    num_processes = len(os.sched_getaffinity(0))//2
-    pool = Pool(processes=num_processes)
+    pool = Pool(processes=self.num_processes)
 
     batch_nums = range(len(batches))
     bound_matrices = [bound_matrix for i in range(len(batches))]
@@ -168,14 +170,13 @@ if __name__ == '__main__':
     clear_print("Training accuracy for mean parameters: %s" % (mean_train_acc))
     clear_print("Validation accuracy for mean parameters: %s" % (mean_val_acc))
 
+
+  total_time = time.time() - epoch_start
+  print("Time to run all epochs: %.3f" % (total_time))
+
   final_train_acc = infer_and_accuracy(data['train_x'], data["train_y"], mean_vars, architecture)
   final_test_acc = infer_and_accuracy(data['test_x'], data["test_y"], mean_vars, architecture)
 
   clear_print("Training accuracy for mean parameters: %s" % (final_train_acc))
   clear_print("Testing accuracy for mean parameters: %s" % (final_test_acc))
-
-  total_time = time.time() - epoch_start
-  print("Time to run all epochs: %.3f" % (total_time))
-
   
-
