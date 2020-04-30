@@ -92,6 +92,50 @@ def get_alt_bound_matrix(network_vars, bound):
 
   return bound_matrix
 
+#def get_mean_bound_matrix(network_vars, bound, diff=0):
+#  new_bound = int(bound - 2**np.floor(np.log2(bound)))
+#  if diff == 0:
+#    diff = new_bound
+#  mean_vars = get_mean_vars(network_vars)
+#  bound_matrix = {}
+#  for key in network_vars[0]:
+#    if "w_" in key or "b_" in key:
+#      bound_matrix["%s_%s" % (key,"lb")] = np.maximum(mean_vars[key] - diff, -bound)
+#      bound_matrix["%s_%s" % (key,"ub")] = np.minimum(mean_vars[key] + diff, bound)
+#
+#  return bound_matrix
+
+def get_mean_bound_matrix(network_vars, bound, diff=0):
+  mean_vars = get_from_vars(network_vars, np.mean)
+  std_vars = get_from_vars(network_vars, np.std)
+  from pdb import set_trace
+  #set_trace()
+  bound_matrix = {}
+  for key in network_vars[0]:
+    if "w_" in key or "b_" in key:
+      if diff == 0:
+        bound_matrix["%s_%s" % (key,"lb")] = np.maximum(mean_vars[key] - std_vars[key], -bound)
+        bound_matrix["%s_%s" % (key,"ub")] = np.minimum(mean_vars[key] + std_vars[key], bound)
+      else:
+        bound_matrix["%s_%s" % (key,"lb")] = np.maximum(mean_vars[key] - diff, -bound)
+        bound_matrix["%s_%s" % (key,"ub")] = np.minimum(mean_vars[key] + diff, bound)
+
+  return bound_matrix
+
+def get_from_vars(network_vars, get_func=np.mean):
+  """network_vars contains varMatrices of all batches"""
+  all_vars = {}
+  mean_vars = {}
+
+  for key in network_vars[0]:
+    all_vars[key] = np.stack([tmp[key] for tmp in network_vars])
+    mean_vars[key] = get_func(all_vars[key], axis=0)
+    mean_vars[key][mean_vars[key] < 0] -= 1e-5
+    mean_vars[key][mean_vars[key] >= 0] += 1e-5
+    mean_vars[key] = np.round(mean_vars[key])
+
+  return mean_vars
+
 def get_mean_vars(network_vars):
   """network_vars contains varMatrices of all batches"""
   all_vars = {}
@@ -151,3 +195,26 @@ def strip_network(varMatrices, arch):
     stripped['w_%s' % nextLayer] = stripped['w_%s' % nextLayer][h,:]
     new_arch[layer] = h.sum()
   return stripped, new_arch
+
+
+# Print iterations progress
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
+    # Print New Line on Complete
+    if iteration == total: 
+        print()

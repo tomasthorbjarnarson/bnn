@@ -2,7 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 from helper.misc import infer_and_accuracy
-from globals import INT, BIN, CONT, LOG, DO_CUTOFF
+from globals import INT, BIN, CONT, LOG, DO_CUTOFF, GUROBI_ENV
 
 vtypes = {
   INT: GRB.INTEGER,
@@ -14,7 +14,7 @@ def get_gurobi_nn(NN, data, architecture, bound, reg=False, fair=""):
   # Init a NN using Gurobi API according to the NN supplied
   class Gurobi_NN(NN):
     def __init__(self, data, architecture, bound, reg, fair):
-      model = gp.Model("Gurobi_NN")
+      model = gp.Model("Gurobi_NN", env=GUROBI_ENV)
       if not LOG:
         model.setParam("OutputFlag", 0)
       NN.__init__(self, model, data, architecture, bound, reg, fair)
@@ -146,7 +146,7 @@ def mycallback(model, where):
         print("Cutoff first optimization from cutoff value: %s" % model._self.cutoff)
         model.cbStopOneMultiObj(0)
       else:
-        print("Terminate from cutoff value: %s" % model._self.cutoff)
+        #print("Terminate from cutoff value: %s" % model._self.cutoff)
         model.terminate()
 
     #cutoff = np.prod(model._output.shape)*np.square(0.1)

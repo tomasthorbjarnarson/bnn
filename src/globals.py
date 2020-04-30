@@ -1,3 +1,5 @@
+import gurobipy as gp
+
 ARCHITECTURES = {
   1: [784, 10],
   2: [784, 16, 10],
@@ -19,3 +21,5 @@ TARGET_ERROR = 0.1 # 90% Accuracy
 MARGIN = 0.5
 
 DO_CUTOFF = True
+
+GUROBI_ENV = gp.Env()
