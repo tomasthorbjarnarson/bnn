@@ -44,6 +44,7 @@ if __name__ == '__main__':
       bounds = [1,3,7]
   elif script =="push":
     num_examples = [20]
+    bounds = [15]
   elif script =="reg":
     hls=[[100]]
     num_examples = [200]
