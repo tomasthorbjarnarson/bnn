@@ -105,11 +105,13 @@ def get_alt_bound_matrix(network_vars, bound):
 #
 #  return bound_matrix
 
-def get_mean_bound_matrix(network_vars, bound, diff=0):
-  mean_vars = get_from_vars(network_vars, np.mean)
+def get_mean_bound_matrix(network_vars, bound, diff=0, weights=[]):
+  if len(weights) == 0:
+    mean_vars = get_from_vars(network_vars, np.mean)
+  else:
+    mean_vars = get_weighted_mean_vars(network_vars, weights)
   std_vars = get_from_vars(network_vars, np.std)
-  from pdb import set_trace
-  #set_trace()
+  print("In get bound matrix")
   bound_matrix = {}
   for key in network_vars[0]:
     if "w_" in key or "b_" in key:
@@ -119,6 +121,15 @@ def get_mean_bound_matrix(network_vars, bound, diff=0):
       else:
         bound_matrix["%s_%s" % (key,"lb")] = np.maximum(mean_vars[key] - diff, -bound)
         bound_matrix["%s_%s" % (key,"ub")] = np.minimum(mean_vars[key] + diff, bound)
+
+  return bound_matrix
+
+def get_weighed_mean_bound_matrix(network_vars, bound, diff, weighted_avg):
+  bound_matrix = {}
+  for key in network_vars[0]:
+    if "w_" in key or "b_" in key:
+      bound_matrix["%s_%s" % (key,"lb")] = np.maximum(weighted_avg[key] - diff, -bound)
+      bound_matrix["%s_%s" % (key,"ub")] = np.minimum(weighted_avg[key] + diff, bound)
 
   return bound_matrix
 
@@ -148,6 +159,24 @@ def get_mean_vars(network_vars):
     mean_vars[key] = np.round(mean_vars[key])
 
   return mean_vars
+
+def get_weighted_mean_vars(network_vars, weights):
+  weighted_avg = {}
+  weights = np.array(weights)
+  weights -= np.min(weights)
+  weights /= np.max(weights)
+  #weights += 1
+  for i,var in enumerate(network_vars):
+    for key in var:
+      if key not in weighted_avg:
+        weighted_avg[key] = weights[i]*var[key]
+      else:
+        weighted_avg[key] += weights[i]*var[key]
+
+  for key in weighted_avg:
+    weighted_avg[key] = np.round(weighted_avg[key]/sum(weights))
+
+  return weighted_avg
 
 def get_median_vars(network_vars):
   """network_vars contains varMatrices of all batches"""
@@ -218,3 +247,13 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     # Print New Line on Complete
     if iteration == total: 
         print()
+
+
+def extract_params(varMatrices, get_keys=["w", "b"]):
+  tmp = {}
+  keys = []
+  for key in varMatrices:
+    if key[0] in get_keys:
+      keys.append(key)
+      tmp[key] = varMatrices[key]
+  return tmp, keys

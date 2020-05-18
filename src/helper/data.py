@@ -91,7 +91,10 @@ def load_keras(dataset, N):
   train_y = train_y[train_indices]
 
   max_num = len(train_x)
-  train_indices = get_unique_examples(train_x, train_y, N)
+  if N < 500:
+    train_indices = get_unique_examples(train_x, train_y, N)
+  else:
+    train_indices = range(N)
   val_indices = [i for i in range(max_num) if i not in train_indices]
 
   data = {}

@@ -5,7 +5,8 @@ from milp.max_correct import MAX_CORRECT
 from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
 from milp.max_m import MAX_M
-from helper.misc import inference, infer_and_accuracy, clear_print, get_bound_matrix, \
+from gd.gd_nn import GD_NN
+from helper.misc import inference, infer_and_accuracy, clear_print, get_bound_matrix, get_mean_bound_matrix, \
                         get_mean_vars,get_median_vars, get_network_size,strip_network
 from helper.data import load_data, get_batches, get_architecture
 from helper.save_data import DataSaver
@@ -21,6 +22,10 @@ milps = {
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
   "sat_margin": SAT_MARGIN
+}
+
+gds = {
+  "gd_nn": GD_NN
 }
 
 solvers = {
@@ -65,7 +70,7 @@ if __name__ == '__main__':
 
   print(args)
 
-  if loss not in milps:
+  if loss not in milps and loss not in gds:
     raise Exception("MILP model %s not known" % loss)
 
   if solver not in solvers:
@@ -93,8 +98,14 @@ if __name__ == '__main__':
   batch_num = 0
   for batch in batches:
     clear_print("Batch: %s. Examples: %s-%s" % (batch_num, batch_num*batch_size, (batch_num+1)*batch_size))
-    nn = get_nn(milps[loss], batch, architecture, bound, reg, fair)
-    nn.train(train_time*60, focus)
+    
+    if loss in milps:
+      nn = get_nn(milps[loss], batch, architecture, bound, reg, fair)
+      nn.train(train_time*60, focus)
+    else:
+      lr = 1e-2
+      nn = GD_NN(batch, batch_size, architecture, lr, bound, seed)
+      nn.train(train_time*60)
 
     obj = nn.get_objective()
     print("Objective value: ", obj)
@@ -172,13 +183,35 @@ if __name__ == '__main__':
     clear_print("Training accuracy for mean parameters: %s" % (train_acc))
     clear_print("Testing accuracy for mean parameters: %s" % (test_acc))
     clear_print("Time to run all batches: %.2f" % (total_time))
+    
+    mean_bound_matrix = get_mean_bound_matrix(network_vars, bound)
+    mean_warm_nn = get_nn(milps[loss], data, architecture, bound, reg, fair)
+    #mean_warm_nn.warm_start(mean_vars)
+    mean_warm_nn.update_bounds(mean_bound_matrix)
+
+    mean_warm_nn.train(train_time*60, focus)
+
+    obj = mean_warm_nn.get_objective()
+    print("Objective value: ", obj)
+
+    mean_warm_varMatrices = mean_warm_nn.extract_values()
+
+    print("Objective value: ", obj)
+
+    warm_train_acc = infer_and_accuracy(mean_warm_nn.data['train_x'], mean_warm_nn.data["train_y"], mean_warm_varMatrices, mean_warm_nn.architecture)
+    warm_test_acc = infer_and_accuracy(mean_warm_nn.data['test_x'], mean_warm_nn.data["test_y"], mean_warm_varMatrices, mean_warm_nn.architecture)
+
+    print("Training accuracy: %s " % (warm_train_acc))
+    print("Testing accuracy: %s " % (warm_test_acc))
+
+    warm_nn_time = sum([i.get_runtime() for i in networks]) + mean_warm_nn.get_runtime()
+    clear_print("Warm start run time: %.2f. Accuracy: %s" % (warm_nn_time, warm_test_acc))
 
   w1 = varMatrices['w_1']
   b1 = varMatrices['b_1']
   if len(architecture) > 2:
     w2 = varMatrices['w_2']
     b2 = varMatrices['b_2']
-    act1 = varMatrices['act_1']
     train = nn.data['train_x']
 
     tmp_inf = np.dot(train, w1) + b1
@@ -192,13 +225,14 @@ if __name__ == '__main__':
 
   stripped,new_arch = strip_network(varMatrices, architecture)
   new_net_size = get_network_size(new_arch, bound)
-  print("New Network memory: %s Bytes" % new_net_size)
+  if new_net_size != net_size:
+    print("New Network memory: %s Bytes" % new_net_size)
 
-  stripped_train_acc = infer_and_accuracy(nn.data['train_x'], nn.data["train_y"], stripped, new_arch)
-  stripped_test_acc = infer_and_accuracy(nn.data['test_x'], nn.data["test_y"], stripped, new_arch)
+    stripped_train_acc = infer_and_accuracy(nn.data['train_x'], nn.data["train_y"], stripped, new_arch)
+    stripped_test_acc = infer_and_accuracy(nn.data['test_x'], nn.data["test_y"], stripped, new_arch)
 
-  print("Stripped Training accuracy: %s " % (stripped_train_acc))
-  print("Stripped Testing accuracy: %s " % (stripped_test_acc))
+    print("Stripped Training accuracy: %s " % (stripped_train_acc))
+    print("Stripped Testing accuracy: %s " % (stripped_test_acc))
 
   if fair:
     female_train = data['train_x'][:,64]
@@ -256,5 +290,5 @@ if __name__ == '__main__':
       progress = nn.progress
     DS = DataSaver(nn, architecture, N, focus, solver)
     DS.plot_periodic(progress)
-    DS.save_json(train_acc, test_acc)
+    #DS.save_json(train_acc, test_acc)
 

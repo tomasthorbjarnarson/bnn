@@ -37,6 +37,8 @@ if __name__ == '__main__':
   elif data == "mnist":
     num_examples = [20,40,60,80,100]
     hls = [[], [16], [16,16]]
+    max_time = 2*60
+
 
   if script == "precision":
     bounds = [1,3,7,15]

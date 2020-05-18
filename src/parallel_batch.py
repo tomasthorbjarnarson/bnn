@@ -6,14 +6,18 @@ from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
 from milp.max_m import MAX_M
 from gd.gd_nn import GD_NN
-from helper.misc import infer_and_accuracy, clear_print, get_mean_bound_matrix, get_mean_vars,printProgressBar
+from helper.misc import infer_and_accuracy, clear_print, get_weighed_mean_bound_matrix, get_mean_vars
+from helper.misc import strip_network,printProgressBar, extract_params, get_weighted_mean_vars
 from helper.data import load_data, get_batches, get_architecture
 import argparse
 import numpy as np
 import time
 from multiprocessing import Pool
 import os
-from pdb import set_trace
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+
 
 milps = {
   "min_w": MIN_W,
@@ -32,7 +36,9 @@ solvers = {
   "cplex": get_cplex_nn
 }
 
-new_seeds = [8353134,14365767666,223454657,9734234,753283393493482349,473056832,3245823]
+new_seeds = [8353134,14365767666,223454657,9734234,753283393493482349,473056832,3245823,
+             3842134,132414364572435,798452456,2132413245,788794342,134457678,213414,69797949393,
+             34131413,46658765,1341324]
 
 class Batch_Runner:
   def __init__(self, loss, data, batch_size, architecture, bound, reg, fair):
@@ -58,7 +64,7 @@ class Batch_Runner:
     varMatrices = nn.extract_values()
     printProgressBar(batch_num+1, self.num_batches)
 
-    return runtime, varMatrices
+    return runtime, extract_params(varMatrices, get_keys=["w","b","H"])[0]
 
   def run_batches(self, batches, bound_matrix):
     batch_start = time.time()    
@@ -151,6 +157,9 @@ if __name__ == '__main__':
   bound_matrix = {}
 
   batch_runner = Batch_Runner(loss, data, batch_size, architecture, bound, reg, fair)
+  all_avgs = []
+  all_train_accs = []
+  all_val_accs = []
 
   for epoch in range(epochs):
     if do_shuffle and epoch > 0:
@@ -161,11 +170,43 @@ if __name__ == '__main__':
     printProgressBar(0, N/batch_size)
     network_vars = batch_runner.run_batches(batches, bound_matrix)
 
-    bound_matrix = get_mean_bound_matrix(network_vars, bound, bound - epoch)
+    if 'H_1' in network_vars[0]:
+      neurons = [sum(x['H_1']) for x in network_vars]
+      print("neurons", neurons)
+      stripped_network_vars = []
+      for var in network_vars:
+        stripped_network, stripped_architecture = strip_network(var, architecture)
+        stripped_network_vars.append(stripped_network)
+      network_vars = stripped_network_vars
+      batch_runner.architecture = stripped_architecture
+      batch_runner.reg = 0
+
+    val_accs = []
+    for var in network_vars:
+      val_acc = infer_and_accuracy(data["val_x"], data["val_y"], var, architecture)
+      val_accs.append(val_acc)
+    weighted_avg = get_weighted_mean_vars(network_vars, val_accs)
+
+    #if epoch < epochs-1:
+    #  for key in weighted_avg:
+    #    rand = np.random.random_sample(weighted_avg[key].shape)
+    #    rand = rand*(2*1+1) - 1
+    #    rand = np.floor(rand)
+    #    weighted_avg[key] += rand
+    
+    bound_matrix = get_weighed_mean_bound_matrix(network_vars, bound, bound - epoch, weighted_avg)
     mean_vars = get_mean_vars(network_vars)
 
-    mean_train_acc = infer_and_accuracy(data['train_x'], data["train_y"], mean_vars, architecture)
-    mean_val_acc = infer_and_accuracy(data['val_x'], data["val_y"], mean_vars, architecture)
+    mean_train_acc = infer_and_accuracy(data["train_x"], data["train_y"], weighted_avg, architecture)
+    mean_val_acc = infer_and_accuracy(data["val_x"], data["val_y"], weighted_avg, architecture)
+    #if mean_val_acc >= best_acc:
+    #  print("Better val acc!")
+    #  best_acc = mean_val_acc
+    #  best_avg = weighted_avg
+
+    all_avgs.append(weighted_avg)
+    all_train_accs.append(mean_train_acc)
+    all_val_accs.append(mean_val_acc)
 
     clear_print("Training accuracy for mean parameters: %s" % (mean_train_acc))
     clear_print("Validation accuracy for mean parameters: %s" % (mean_val_acc))
@@ -174,9 +215,28 @@ if __name__ == '__main__':
   total_time = time.time() - epoch_start
   print("Time to run all epochs: %.3f" % (total_time))
 
-  final_train_acc = infer_and_accuracy(data['train_x'], data["train_y"], mean_vars, architecture)
-  final_test_acc = infer_and_accuracy(data['test_x'], data["test_y"], mean_vars, architecture)
+  print(all_train_accs)
+  print(all_val_accs)
 
-  clear_print("Training accuracy for mean parameters: %s" % (final_train_acc))
-  clear_print("Testing accuracy for mean parameters: %s" % (final_test_acc))
+  best_ind = np.argmax(all_val_accs)
+  best_avg = all_avgs[best_ind]
+
+  final_train_acc = infer_and_accuracy(data["train_x"], data["train_y"], best_avg, architecture)
+  final_val_acc = infer_and_accuracy(data["val_x"], data["val_y"], best_avg, architecture)
+  final_test_acc = infer_and_accuracy(data["test_x"], data["test_y"], best_avg, architecture)
+
+  clear_print("Final Training accuracy for mean parameters: %s" % (final_train_acc))
+  clear_print("Final Validation accuracy for mean parameters: %s" % (final_val_acc))
+  clear_print("Final Testing accuracy for mean parameters: %s" % (final_test_acc))
   
+  colors = sns.color_palette("husl", 3)
+  sns.set_style("darkgrid")
+  plt.plot(range(epochs), all_train_accs, color=colors[0], label="Train accuracy")
+  plt.plot(range(epochs), all_val_accs, color=colors[1], label="Validation accuracy")
+  plt.legend()
+  plt.ylim(0,100)
+  plt.ylabel("Accuracy %")
+  plt.xlabel("Epochs")
+  plt.xticks(range(epochs))
+  plt.title("Batch training - N: %s. Batch Size: %s. Loss: %s" % (N, batch_size, loss))
+  plt.savefig("results/plots/Learning Curve - %s_%s" % (loss,datetime.now().strftime("%d-%m-%H:%M")))

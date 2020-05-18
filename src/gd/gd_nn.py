@@ -7,12 +7,17 @@ Ported from Icarte's formulation from https://bitbucket.org/RToroIcarte/bnn/
 Modified to allow for any integer precision, i.e. 1 (binary) or 3,7,15 etc
 """
 class GD_NN:
-  def __init__(self, data, N, architecture, lr, bound, seed=1):
+  def __init__(self, data, N, architecture, lr, bound, seed=1, batch_size=0):
     tf.set_random_seed(seed)
     self.sess = tf.Session()
     self.lr = lr
     self.bound = bound
     self.architecture = architecture
+    if batch_size == 0:
+      self.batch_size = N
+    else:
+      self.batch_size = batch_size
+    self.N = N
 
     self.cutoff = N*TARGET_ERROR*MARGIN*MARGIN
     print("cutoff", self.cutoff)
@@ -53,7 +58,7 @@ class GD_NN:
     self.optimizer = tf.train.AdamOptimizer(learning_rate=learn).minimize(self.loss, global_step=global_step)
 
   def train(self, max_time):
-    start = time()
+    start_time = time()
     self.sess.run(tf.global_variables_initializer())
     loss_count = 500
     losses = np.random.rand(loss_count)
@@ -62,21 +67,24 @@ class GD_NN:
     finished = False
 
     while not finished:
-      _, loss = self.sess.run([self.optimizer, self.loss], feed_dict=self.train_dict)
-      end = time()
+      for start,end in zip(range(0,self.N,self.batch_size), range(self.batch_size, self.N+1,self.batch_size)):
+        batch_dict = {self.x: self.data['train_x'][start:end], self.y: self.data['oh_train_y'][start:end]}
+        _, loss = self.sess.run([self.optimizer, self.loss], feed_dict=batch_dict)
+
+      loss = self.loss.eval(session=self.sess, feed_dict = self.train_dict)
+      end_time = time()
       losses[loss_i] = loss
       loss_i = (loss_i + 1) % loss_count
-      finished = loss <= self.cutoff or np.std(losses) <= 1e-5 or (end - start) >= max_time
-
-      if epoch % 500 == 0 or finished:
+      finished = loss <= self.cutoff or np.std(losses) <= 1e-5 or (end_time - start_time) >= max_time
+      if epoch % (20000/self.N) == 0 or finished:
         train_perf = self.sess.run(self.accuracy, feed_dict = self.train_dict)
         val_perf = self.sess.run(self.accuracy, feed_dict = self.val_dict)
         print("Epoch: %s. Train: %% %.2f. Val: %% %.2f. Loss: %s. Std: %s" % (epoch, 100*train_perf, 100*val_perf, loss, np.std(losses)))
 
       epoch += 1
 
-    end = time()
-    self.runtime = end - start
+    end_time = time()
+    self.runtime = end_time - start_time
 
   def get_objective(self):
     loss = self.sess.run(self.loss, feed_dict=self.train_dict)

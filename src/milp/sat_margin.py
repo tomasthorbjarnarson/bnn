@@ -1,22 +1,22 @@
 import numpy as np
 from milp.nn import NN
-from globals import BIN, TARGET_ERROR, MARGIN, EPSILON
+from globals import BIN, CONT, TARGET_ERROR, MARGIN, EPSILON
 
 class SAT_MARGIN(NN):
   def __init__(self, model, data, architecture, bound, reg, fair):
 
     NN.__init__(self, model, data, architecture, bound, reg, fair)
 
+    # Cutoff set so as not too optimize fully.
+    self.cutoff = self.N*TARGET_ERROR
     self.init_output()
-    self.add_output_constraints()
     if reg:
       self.add_regularizer()
     if reg == -1:
       self.calc_multi_obj()
     else:
       self.calc_objective()
-    # Cutoff set so as not too optimize fully.
-    self.cutoff = self.N*TARGET_ERROR
+    self.add_output_constraints()
 
   def init_output(self):
     self.output = np.full((self.N, self.architecture[-1]), None)
@@ -30,6 +30,11 @@ class SAT_MARGIN(NN):
     neurons_in = self.architecture[lastLayer]
     neurons_out = self.architecture[layer]
 
+    if self.reg:
+      self.margin = self.add_var(CONT, name="margin", bound=self.out_bound)
+      self.new_out_bound = (self.H[len(self.architecture)-2].sum() + 1)*self.bound
+      self.add_constraint(self.margin >= 0.5*self.new_out_bound/2)
+
     for k in range(self.N):
       for j in range(neurons_out):
         inputs = []
@@ -39,10 +44,14 @@ class SAT_MARGIN(NN):
           else:
             inputs.append(self.var_c[layer][k,i,j])
         pre_activation = sum(inputs) + self.biases[layer][j]
-        pre_activation = 2*pre_activation/self.out_bound
-        # HYPERPARAMETER 0.5
-        self.add_constraint((self.output[k,j] == 1) >> (pre_activation*self.oh_train_y[k,j] >= MARGIN))
-        self.add_constraint((self.output[k,j] == 0) >> (pre_activation*self.oh_train_y[k,j] <= MARGIN - EPSILON))
+        if self.reg:
+          self.add_constraint((self.output[k,j] == 1) >> (pre_activation*self.data['oh_train_y'][k,j] >= self.margin))
+          self.add_constraint((self.output[k,j] == 0) >> (pre_activation*self.data['oh_train_y'][k,j] <= self.margin - EPSILON))
+        else: 
+          pre_activation = 2*pre_activation/self.out_bound
+          # HYPERPARAMETER 0.5
+          self.add_constraint((self.output[k,j] == 1) >> (pre_activation*self.data['oh_train_y'][k,j] >= MARGIN))
+          self.add_constraint((self.output[k,j] == 0) >> (pre_activation*self.data['oh_train_y'][k,j] <= MARGIN - EPSILON))
 
   def calc_objective(self):
     self.obj = np.prod(self.output.shape) - self.output.sum()
@@ -57,7 +66,7 @@ class SAT_MARGIN(NN):
   def calc_multi_obj(self):
     self.obj = np.prod(self.output.shape) - self.output.sum()
     self.m.setObjectiveN(self.obj, 0, 2)
-    #self.m.ObjNAbsTol = 3
+    #self.m.ObjNAbsTol = self.cutoff
 
     if self.reg:
       regObj = 0
