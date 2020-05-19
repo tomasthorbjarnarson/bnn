@@ -49,7 +49,7 @@ if __name__ == '__main__':
     bounds = [15]
   elif script =="reg":
     hls=[[100]]
-    num_examples = [200]
+    num_examples = [300]
     max_time = 24*60
     bounds = [15]
     regs = [0, -1, 1, 0.1]
