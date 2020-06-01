@@ -57,6 +57,22 @@ def get_batches(data, batch_size):
   
   return batches
 
+def get_training_batches(data, batch_size):
+  train_batches = []
+  for i in range(0, len(data["train_x"]), batch_size):
+    tmp_data = {}
+    tmp_data["train_x"] = data["train_x"][i:i+batch_size]
+    tmp_data["train_y"] = data["train_y"][i:i+batch_size]
+    tmp_data["oh_train_y"] = data["oh_train_y"][i:i+batch_size]
+    tmp_data["val_x"] = data["val_x"]
+    tmp_data["val_y"] = data["val_y"]
+    tmp_data["oh_val_y"] = data["oh_val_y"]
+
+    train_batches.append(tmp_data)
+  
+  return train_batches
+   
+
 def load_data(dataset, N, seed):
   """Return list of batches of dataset. If batch_size == 0 : all N elements are in first batch"""
   random.seed(seed)
