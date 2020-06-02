@@ -54,7 +54,7 @@ class GD_NN:
     self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
     global_step = tf.Variable(0, trainable=False)
-    learn = tf.compat.v1.train.exponential_decay(lr, global_step, 1000, 0.9)
+    learn = tf.compat.v1.train.exponential_decay(lr, global_step, 1000, 0.95)
     self.optimizer = tf.train.AdamOptimizer(learning_rate=learn).minimize(self.loss, global_step=global_step)
 
   def train(self, max_time):
@@ -76,7 +76,7 @@ class GD_NN:
       losses[loss_i] = loss
       loss_i = (loss_i + 1) % loss_count
       finished = loss <= self.cutoff or np.std(losses) <= 1e-5 or (end_time - start_time) >= max_time
-      if epoch % (20000/self.N) == 0 or finished:
+      if epoch % 5*(25000/self.N) == 0 or finished:
         train_perf = self.sess.run(self.accuracy, feed_dict = self.train_dict)
         val_perf = self.sess.run(self.accuracy, feed_dict = self.val_dict)
         print("Epoch: %s. Train: %% %.2f. Val: %% %.2f. Loss: %s. Std: %s" % (epoch, 100*train_perf, 100*val_perf, loss, np.std(losses)))
