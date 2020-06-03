@@ -269,7 +269,7 @@ if __name__ == '__main__':
   if solver not in solvers:
     raise Exception("Solver %s not known" % solver)
 
-  seeds = [1348612,7864568,9434861]
+  seeds = [1348612,7864568,9434861,3618393,93218484358]
 
   seed_train_accs = np.empty((len(seeds),epochs))
   seed_val_accs = np.empty((len(seeds),epochs))
