@@ -98,7 +98,7 @@ def batch_train():
     times.append(nn_runtime)
 
   clear_print("Train: %s +/- %s" % (np.mean(train_accs), np.std(train_accs)))
-  clear_print("Test: %s +/- %s" % (np.mean(test_acc), np.std(test_acc)))
+  clear_print("Test: %s +/- %s" % (np.mean(test_accs), np.std(test_accs)))
   clear_print("Time: %s +/- %s" % (np.mean(nn_runtime), np.std(nn_runtime)))
 
 if __name__ == '__main__':
