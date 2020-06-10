@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
 
   if script == "precision":
-    bounds = [1,3,7,15]
+    bounds = [1,3,7,15, 31]
     if short:
       bounds = [1,3,7]
   elif script =="push":

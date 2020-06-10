@@ -249,9 +249,12 @@ class Script_Master():
     plt.figure(index)
     sns.set_style("darkgrid")
     for i,loss in enumerate(self.losses):
+      loss_label = loss
+      if "-bound=" in loss_label:
+        loss_label = "P=%s" % loss_label.split("-bound=")[-1]
       x = [int(z) for z in self.results[hl_key][loss][setting].keys()]
       y, err = get_mean_std(self.results[hl_key][loss][setting].values())
-      plt.plot(x,y, label=loss, color = loss_colors[loss])
+      plt.plot(x,y, label=loss_label, color = loss_colors[loss])
       plt.fill_between(x, y - err, y + err, alpha=0.3, facecolor=loss_colors[loss])
 
     if len(self.bounds) == 1:
@@ -373,9 +376,12 @@ class Script_Master():
       raise Exception("Unkown fairness definition: %s" % fair_type)
     print_str = between
     for hl_key in self.results:
+      all_bars = []
       for i,loss in enumerate(self.losses):
         _,fair = loss.split("-fair=")
-        if fair == fair_type or fair == "":
+        if fair == "":
+          fair = "None"
+        if fair == fair_type or fair == "None":
           loss_result = self.results[hl_key][loss]
           ex = self.num_examples[0]
           if str(ex) in loss_result["train_accs"]:
@@ -394,6 +400,35 @@ class Script_Master():
 
           train_fair = self.results[hl_key][loss]["train_%s" % fair_type]
           test_fair = self.results[hl_key][loss]["test_%s" % fair_type]
+          if fair_type == "EO":
+            plt.figure()
+            width = 0.35
+            bars = []
+            for seed,_ in enumerate(train_fair):
+              tr_seed = train_fair[seed]
+              tst_seed = test_fair[seed]
+              tmp = (np.abs(tr_seed['p111'] - tr_seed['p101']), np.abs(tst_seed['p111'] - tst_seed['p101']),"true", fair)
+              tmp2 = (np.abs(tr_seed['p110'] - tr_seed['p100']), np.abs(tst_seed['p110'] - tst_seed['p100']),"false", fair)
+              bars.append(tmp)
+              bars.append(tmp2)
+            all_bars.append(bars)
+            tr_true_pos_diffs = [np.abs(x['p111'] - x['p101']) for x in train_fair]
+            tr_false_pos_diffs = [np.abs(x['p110'] - x['p100']) for x in train_fair]
+            tst_true_pos_diffs = [np.abs(x['p111'] - x['p101']) for x in test_fair]
+            tst_false_pos_diffs = [np.abs(x['p110'] - x['p100']) for x in test_fair]
+            ind = np.arange(len(tr_true_pos_diffs)*2)
+            plt.bar(ind-width/2, tr_true_pos_diffs+tr_false_pos_diffs, width, label="Train")
+            plt.bar(ind+width/2, tst_true_pos_diffs+tst_false_pos_diffs, width, label="Test")
+            
+            label1 = "Seed %s True Positives"
+            label2 = "Seed %s False Positives"
+            plt.xticks(ind-0.7, (label1 % 1, label1 % 2, label1 % 3, label2 % 1, label2 %2, label2 % 3), rotation=15)
+            plt.legend()
+            plt.title("Fairness constraint: %s " % fair)
+            #plt.show()
+          else:
+            tr_pos = [np.abs(x['p11'] - x['p10']) for x in train_fair]
+            tst_pos = [np.abs(x['p11'] - x['p10']) for x in test_fair]
           for j, seed in enumerate(self.seeds):
             print_str += "Seed: %s.\n" % seed
             print_str += "Train: " + format_str.format(**train_fair[j])
@@ -404,7 +439,17 @@ class Script_Master():
 
     print(print_str)
 
-
+    #true_pos_diffs = [np.abs(x['p111'] - x['p101']) for x in self.results[hl_key][loss]["train_%s" % fair_type]]
+    #false_pos_diffs = [np.abs(x['p110'] - x['p100']) for x in self.results[hl_key][loss]["train_%s" % fair_type]]
+    #all_bars = list(zip(all_bars[0], all_bars[1]))
+    #s1 = np.array(all_bars[0:2])
+    #s2 = all_bars[2:4]
+    #s3 = all_bars[4:6]
+    #s1_bars = np.array(s1)[:,:,:2].flatten().astype(np.float)
+    #colors = ["green" if i % 2 == 0 else "red" for i,_ in enumerate(s1_bars)]
+    #plt.figure()
+    #plt.bar(range(len(s1_bars)), s1_bars, color=colors) 
+    #plt.show()
 
 
   def print_max_time_left(self):

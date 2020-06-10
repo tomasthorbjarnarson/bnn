@@ -315,7 +315,7 @@ if __name__ == '__main__':
   x = range(epochs)
   y = np.mean(stds,axis=0)
   err = np.std(stds, axis=0)
-  plt.plot(x, y, color=colors[0], label="Standar Deviation")
+  plt.plot(x, y, color=colors[0], label="Standard Deviation")
   plt.fill_between(x, y - err, y + err, alpha=0.3, facecolor=colors[0])
   plt.legend()
   plt.xlabel("Epochs")
