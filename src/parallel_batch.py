@@ -101,7 +101,7 @@ class Batch_Runner:
     batch = batch_data[0]
     bound_matrix = batch_data[1]
     batch_num = batch_data[2]
-    nn = get_nn(milps[self.loss], batch, self.architecture, self.bound, self.reg, self.fair)
+    nn = get_nn(milps[self.loss], batch, self.architecture, self.bound, self.reg, self.fair, batch=True)
     nn.m.setParam('Threads', 2)
     nn.update_bounds(bound_matrix)
     nn.train(train_time*60, focus)

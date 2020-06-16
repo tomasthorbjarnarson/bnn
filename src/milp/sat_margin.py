@@ -3,9 +3,9 @@ from milp.nn import NN
 from globals import BIN, CONT, TARGET_ERROR, MARGIN, EPSILON
 
 class SAT_MARGIN(NN):
-  def __init__(self, model, data, architecture, bound, reg, fair):
+  def __init__(self, model, data, architecture, bound, reg, fair, batch):
 
-    NN.__init__(self, model, data, architecture, bound, reg, fair)
+    NN.__init__(self, model, data, architecture, bound, reg, fair, batch)
 
     # Cutoff set so as not too optimize fully.
     self.cutoff = self.N*TARGET_ERROR

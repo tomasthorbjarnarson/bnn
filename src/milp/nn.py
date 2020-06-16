@@ -7,7 +7,7 @@ import numpy as np
 from globals import INT, BIN, CONT, EPSILON
 
 class NN:
-  def __init__(self, model, data, architecture, bound, reg, fair):
+  def __init__(self, model, data, architecture, bound, reg, fair, batch=False):
 
     self.N = len(data["train_x"])
     self.architecture = architecture
@@ -18,6 +18,7 @@ class NN:
     self.bound = bound
     self.reg = reg
     self.fair = fair
+    self.batch = batch
 
     self.m = model
 
@@ -39,6 +40,8 @@ class NN:
 
     # All pixels that are 0 in every example are considered dead
     self.dead = np.all(self.train_x == 0, axis=0)
+    if self.batch:
+      self.dead = np.all(self.train_x == 10000, axis=0)
 
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
       layer = lastLayer + 1
@@ -110,6 +113,8 @@ class NN:
         self.add_constraint((self.H[layer][j] == 0) >> (self.biases[layer][j] == 0))
         for n in range(self.architecture[layer+1]):
           self.add_constraint((self.H[layer][j] == 0) >> (self.weights[layer+1][j,n] == 0))
+          #for k in range(self.N):
+          #  self.add_constraint((self.H[layer][j] == 0) >> (self.var_c[layer+1][k,j,n] == 0))
 
     # Last hidden layer should have at least as many neurons as the output layer
     self.add_constraint(self.H[layer].sum() >= self.architecture[-1])

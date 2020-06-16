@@ -18,11 +18,11 @@ from gd.gd_nn import GD_NN
 focus = 1
 
 milps = {
-  "min_w": MIN_W,
-  "max_m": MAX_M,
   "max_correct": MAX_CORRECT,
   "min_hinge": MIN_HINGE,
-  "sat_margin": SAT_MARGIN
+  "sat_margin": SAT_MARGIN,
+  "min_w": MIN_W,
+  "max_m": MAX_M,
 }
 
 gds = {
@@ -31,8 +31,16 @@ gds = {
 
 #add_prec = lambda x: ["%s-%s" % (x,i) for i in [1,3,7,15,31]]
 #all_possible_losses = [add_prec(loss) for loss in list(milps.keys())+list(gds.keys())]
-colors = sns.color_palette("husl", len(milps) + len(gds))
-loss_colors = dict(zip(list(milps.keys())+list(gds.keys()), colors))
+colors = sns.color_palette("Set1", len(milps) + len(gds)+3)
+loss_colors = {
+  "max_correct": colors[0],
+  "min_hinge": colors[1],
+  "sat_margin": colors[2],
+  "gd_nn": colors[3],
+  "min_w": colors[4],
+  "max_m": colors[6]
+}
+#loss_colors = dict(zip(list(milps.keys())+list(gds.keys()), colors))
 
 
 class Script_Master():
@@ -252,6 +260,12 @@ class Script_Master():
       loss_label = loss
       if "-bound=" in loss_label:
         loss_label = "P=%s" % loss_label.split("-bound=")[-1]
+      if loss_label == "min_w":
+        loss_label = "min-weight"
+      if loss_label == "max_m":
+        loss_label = "max-margin"
+      if "_" in loss_label:
+        loss_label = loss_label.replace("_","-")
       x = [int(z) for z in self.results[hl_key][loss][setting].keys()]
       y, err = get_mean_std(self.results[hl_key][loss][setting].values())
       plt.plot(x,y, label=loss_label, color = loss_colors[loss])
@@ -311,7 +325,7 @@ class Script_Master():
   def plot_reg_results(self):
     def get_reg_label(reg):
       if reg == 0:
-        return "No architecture optimization"
+        return "No model compression"
       elif reg == -1:
         return "Hierarchical optimization"
       else:

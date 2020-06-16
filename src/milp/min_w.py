@@ -3,9 +3,9 @@ from milp.nn import NN
 from globals import EPSILON, BIN
 
 class MIN_W(NN):
-  def __init__(self, model, data, architecture, bound, reg, fair):
+  def __init__(self, model, data, architecture, bound, reg, fair, batch):
 
-    NN.__init__(self, model, data, architecture, bound, reg, fair)
+    NN.__init__(self, model, data, architecture, bound, reg, fair, batch)
     self.add_abs_params()
     self.add_output_constraints()
     self.calc_objective()

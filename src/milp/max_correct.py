@@ -3,14 +3,20 @@ from milp.nn import NN
 from globals import EPSILON, BIN, TARGET_ERROR
 
 class MAX_CORRECT(NN):
-  def __init__(self, model, data, architecture, bound, reg, fair):
+  def __init__(self, model, data, architecture, bound, reg, fair, batch):
 
-    NN.__init__(self, model, data, architecture, bound, reg, fair)
+    NN.__init__(self, model, data, architecture, bound, reg, fair, batch)
 
     self.init_output()
     self.add_output_constraints()
-    self.calc_objective()
     self.cutoff = self.N*TARGET_ERROR
+    #self.calc_objective()
+    if reg:
+      self.add_regularizer()
+    if reg == -1:
+      self.calc_multi_obj()
+    else:
+      self.calc_objective()
 
   def init_output(self):
     self.output = np.full((self.N, self.architecture[-1]), None)
@@ -45,7 +51,26 @@ class MAX_CORRECT(NN):
         if self.oh_train_y[k,j] > 0:
           self.obj -= self.output[k,j]
 
+    if self.reg:
+      for layer in self.H:
+        self.obj += self.reg*self.H[layer].sum()
+
     self.set_objective()
+
+  def calc_multi_obj(self):
+    self.obj = self.N
+    for k in range(self.N):
+      for j in range(self.architecture[-1]):
+        if self.oh_train_y[k,j] > 0:
+          self.obj -= self.output[k,j]
+    self.m.setObjectiveN(self.obj, 0, 2)
+    self.m.ObjNAbsTol = self.cutoff
+
+    if self.reg:
+      regObj = 0
+      for layer in self.H:
+        regObj += self.H[layer].sum()
+      self.m.setObjectiveN(regObj, 1, 1)
 
   def extract_values(self, get_func=lambda z: z.x):
     varMatrices = NN.extract_values(self, get_func)

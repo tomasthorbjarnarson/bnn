@@ -3,9 +3,9 @@ from milp.nn import NN
 from globals import CONT, TARGET_ERROR, MARGIN
 
 class MIN_HINGE(NN):
-  def __init__(self, model, data, architecture, bound, reg, fair):
+  def __init__(self, model, data, architecture, bound, reg, fair, batch):
 
-    NN.__init__(self, model, data, architecture, bound, reg, fair)
+    NN.__init__(self, model, data, architecture, bound, reg, fair, batch)
 
     self.init_output()
     self.add_output_constraints()
