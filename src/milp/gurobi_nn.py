@@ -141,10 +141,17 @@ def mycallback(model, where):
     model._val_acc = val_acc
 
     # ModelSense == 1 makes sure it is minimization
-    if DO_CUTOFF and int(objbst) <= model._self.cutoff and model.ModelSense == 1 and model._self.reg <= 0:
+    if DO_CUTOFF and int(objbst) <= model._self.cutoff and model.ModelSense == 1:# and model._self.reg <= 0:
       if model._self.reg == -1:
         #print("Cutoff first optimization from cutoff value: %s" % model._self.cutoff)
         model.cbStopOneMultiObj(0)
+      elif model._self.reg > 0:
+        hls = 0
+        for layer in model._self.H:
+          hls += varMatrices["H_%s" % layer].sum()
+        if hls == architecture[-1] and int(objbst) - hls <= model._self.cutoff:
+          model.terminate()
+
       else:
         #print("Terminate from cutoff value: %s" % model._self.cutoff)
         model.terminate()

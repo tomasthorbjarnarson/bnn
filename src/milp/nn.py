@@ -114,7 +114,8 @@ class NN:
         for n in range(self.architecture[layer+1]):
           self.add_constraint((self.H[layer][j] == 0) >> (self.weights[layer+1][j,n] == 0))
           #for k in range(self.N):
-          #  self.add_constraint((self.H[layer][j] == 0) >> (self.var_c[layer+1][k,j,n] == 0))
+            #self.add_constraint((self.H[layer][j] == 0) >> (self.var_c[layer+1][k,j,n] == 0))
+            #self.add_constraint((self.H[layer][j] == 0) >> (self.act[layer][j] == 1))
 
     # Last hidden layer should have at least as many neurons as the output layer
     self.add_constraint(self.H[layer].sum() >= self.architecture[-1])
@@ -161,7 +162,7 @@ class NN:
       self.female_pred1_true0 = (females*false_labels*self.pred_labels).sum() / (females*false_labels).sum() 
       self.male_pred1_true0 = (males*false_labels*self.pred_labels).sum() / (males*false_labels).sum()
 
-      fair_constraint = 0.05
+      fair_constraint = 0.02
       self.add_constraint(self.female_pred1_true1 - self.male_pred1_true1 <= fair_constraint)
       self.add_constraint(self.female_pred1_true1 - self.male_pred1_true1 >= -fair_constraint)
       self.add_constraint(self.female_pred1_true0 - self.male_pred1_true0 <= fair_constraint)
@@ -171,8 +172,10 @@ class NN:
       self.male_pred1 = (males*self.pred_labels).sum() / males.sum()
 
       fair_constraint = 0.05
-      self.add_constraint(self.female_pred1 - self.male_pred1 <= fair_constraint)
-      self.add_constraint(self.female_pred1 - self.male_pred1 >= -fair_constraint)
+      #self.add_constraint(self.female_pred1 - self.male_pred1 <= fair_constraint)
+      #self.add_constraint(self.female_pred1 - self.male_pred1 >= -fair_constraint)
+      self.add_constraint(self.female_pred1 >= 0.8*self.male_pred1)
+      self.add_constraint(self.male_pred1 >= 0.8*self.female_pred1)
 
   def update_bounds(self, bound_matrix={}):
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
