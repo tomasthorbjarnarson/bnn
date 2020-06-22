@@ -40,8 +40,8 @@ class NN:
 
     # All pixels that are 0 in every example are considered dead
     self.dead = np.all(self.train_x == 0, axis=0)
-    if self.batch:
-      self.dead = np.all(self.train_x == 10000, axis=0)
+    #if self.batch:
+    #  self.dead = np.all(self.train_x == 10000, axis=0)
 
     for lastLayer, neurons_out in enumerate(self.architecture[1:]):
       layer = lastLayer + 1

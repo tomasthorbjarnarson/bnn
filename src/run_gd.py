@@ -64,6 +64,7 @@ def test_stuff():
 def batch_train():
   N = 25000
   hls = [16]
+  epochs = 10000
   
   lr = 1e-1
   bound = 15
@@ -99,7 +100,7 @@ def batch_train():
 
   clear_print("Train: %s +/- %s" % (np.mean(train_accs), np.std(train_accs)))
   clear_print("Test: %s +/- %s" % (np.mean(test_accs), np.std(test_accs)))
-  clear_print("Time: %s +/- %s" % (np.mean(nn_runtime), np.std(nn_runtime)))
+  clear_print("Time: %s +/- %s" % (np.mean(times), np.std(times)))
 
 if __name__ == '__main__':
   batch_train()
