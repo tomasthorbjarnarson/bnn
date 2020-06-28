@@ -360,7 +360,7 @@ class Script_Master():
         plt.ylabel(self.get_plot_ylabel(setting))
         plt.title(self.get_plot_title(setting))
         plt.ylim(self.get_plot_ylim(setting))
-        plt.legend(labels=[get_reg_label(0), get_reg_label(-1), get_reg_label(1), get_reg_label(0.1)])
+        plt.legend(labels=[get_reg_label(0), get_reg_label(-1), get_reg_label(1), get_reg_label(0.1)], loc="lower center")#, bbox_to_anchor=(0,0,1,1))
 
         j += 1
       #handles, labels = axs[0].get_legend_handles_labels()
@@ -380,7 +380,7 @@ class Script_Master():
   def visualize_fairness(self, fair_type):
     small_between = "----------\n"
     between = "===============\n"
-    EO_str = "P111: {p111:.3f}. P101: {p101:.3f}. P110: {p100:.3f}. P100: {p100:.3f}.\n"
+    EO_str = "P111: {p111:.3f}. P101: {p101:.3f}. P110: {p110:.3f}. P100: {p100:.3f}.\n"
     DP_str = "P11: {p11:.3f}. P10: {p10:.3f}.\n"
     if fair_type == "EO":
       format_str = EO_str
@@ -464,6 +464,49 @@ class Script_Master():
     #plt.figure()
     #plt.bar(range(len(s1_bars)), s1_bars, color=colors) 
     #plt.show()
+
+  def make_tables(self):
+
+    from pdb import set_trace
+
+    settings = ["train_accs", "test_accs", "runtimes"]
+
+    def gen_table_start(seeds, num_examples):
+      ex_len = len(num_examples)
+      table_start = """\\begin{table}[H]
+      \\centering
+      \\begin{tabular}{l"""
+
+      num_cols = len(seeds)*ex_len
+      table_start += "p{0.6cm}"*num_cols + "}\n"
+
+      table_start += """\\toprule
+      MIP Models & \\multicolumn{%s}{c}{Seed 1} & \\multicolumn{%s}{c}{Seed 2} & \\multicolumn{%s}{c}{Seed 3} \\\\
+      \\cmidrule(lr){2-%s}
+      \\cmidrule(lr){%s-%s}
+      \\cmidrule(lr){%s-%s}
+      """ % (ex_len, ex_len, ex_len, 2+ex_len-1,2+ex_len,2+2*ex_len-1,2+2*ex_len,2+3*ex_len-1)
+
+      table_start += "{} &" + " & ".join([(" & ".join(str(x) for x in num_examples))]*len(seeds)) + "\\\\ \n \\midrule \n"
+
+      return table_start
+
+
+    for hl_key in self.results:
+      for setting in settings:        
+        table = gen_table_start(self.seeds, self.num_examples)
+        for loss in self.losses:
+          table += loss
+          for i,seed in enumerate(self.seeds):
+            tmp_res = self.results[hl_key][loss][setting]
+            for ex in tmp_res:
+              table += " & %.2f" % tmp_res[ex][i]
+          table += "\\\\ \n"
+        table += "\\bottomrule \n \\end{tabular} \n \\caption{%s} \n \\label{Foo} \n \\end{table}"
+        with open("tablestuff.txt", "w") as f:
+          f.write(table)
+        set_trace()
+
 
 
   def print_max_time_left(self):

@@ -153,7 +153,7 @@ class NN:
           pre_acts -= pre_activation
 
       self.add_constraint((self.pred_labels[k] == 0) >> (pre_acts >= 0))
-      self.add_constraint((self.pred_labels[k] == 1) >> (pre_acts <= 0))
+      self.add_constraint((self.pred_labels[k] == 1) >> (pre_acts <= -EPSILON))
 
     if self.fair == "EO":
       self.female_pred1_true1 = (females*labels*self.pred_labels).sum() / (females*labels).sum() 
