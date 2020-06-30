@@ -59,6 +59,7 @@ class Script_Master():
     self.bounds = bounds
     self.regs = regs
     self.loss_colors = loss_colors
+    self.fair = fair
 
     ok = False
     if len(bounds) == 1:
