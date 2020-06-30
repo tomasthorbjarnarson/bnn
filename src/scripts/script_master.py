@@ -230,19 +230,20 @@ class Script_Master():
         else:
           nn_results["HL"].append(sum(arch[1:-1]))
 
-        labels_train = np.array(inference(data['train_x'], varMatrices, arch))
-        labels_test = np.array(inference(data['test_x'], varMatrices, arch))
-        tr_p111, tr_p101, tr_p110, tr_p100 = equalized_odds(data['train_x'], labels_train, data['train_y'])
-        tst_p111, tst_p101, tst_p110, tst_p100 = equalized_odds(data['test_x'], labels_test, data['test_y'])
+        if self.fair:
+          labels_train = np.array(inference(data['train_x'], varMatrices, arch))
+          labels_test = np.array(inference(data['test_x'], varMatrices, arch))
+          tr_p111, tr_p101, tr_p110, tr_p100 = equalized_odds(data['train_x'], labels_train, data['train_y'])
+          tst_p111, tst_p101, tst_p110, tst_p100 = equalized_odds(data['test_x'], labels_test, data['test_y'])
 
-        nn_results["train_EO"].append({'p111': tr_p111, 'p101': tr_p101, 'p110': tr_p110, 'p100': tr_p100})
-        nn_results["test_EO"].append({'p111': tst_p111, 'p101': tst_p101, 'p110': tst_p110, 'p100': tst_p100})
+          nn_results["train_EO"].append({'p111': tr_p111, 'p101': tr_p101, 'p110': tr_p110, 'p100': tr_p100})
+          nn_results["test_EO"].append({'p111': tst_p111, 'p101': tst_p101, 'p110': tst_p110, 'p100': tst_p100})
 
-        tr_p11, tr_p10 = demographic_parity(data['train_x'], labels_train, data['train_y'])
-        tst_p11, tst_p10 = demographic_parity(data['test_x'], labels_test, data['test_y'])
+          tr_p11, tr_p10 = demographic_parity(data['train_x'], labels_train, data['train_y'])
+          tst_p11, tst_p10 = demographic_parity(data['test_x'], labels_test, data['test_y'])
 
-        nn_results["train_DP"].append({'p11': tr_p11, 'p10': tr_p10})
-        nn_results["test_DP"].append({'p11': tst_p11, 'p10': tst_p10})
+          nn_results["train_DP"].append({'p11': tr_p11, 'p10': tr_p10})
+          nn_results["test_DP"].append({'p11': tst_p11, 'p10': tst_p10})
 
         self.max_time_left -= self.max_runtime
 
@@ -471,41 +472,111 @@ class Script_Master():
 
     settings = ["train_accs", "test_accs", "runtimes"]
 
-    def gen_table_start(seeds, num_examples):
+    def get_losses_name(loss):
+      losses_names = {
+        "min_w": "Min-weight",
+        "max_m": "Max-margin",
+        "max_correct": "Max-correct",
+        "min_hinge": "Min-hinge",
+        "sat_margin": "Sat-margin",
+        "gd_nn": "GD baseline"
+      }
+
+      if loss in losses_names:
+        return losses_names[loss]
+      elif "-bound=" in loss:
+        loss, P = loss.split("-bound=")
+        if loss in losses_names:
+          return "%s, $P=%s$" % (losses_names[loss], P)
+      elif "-reg=" in loss:
+        loss, reg = loss.split("-reg=")
+        if loss in losses_names:
+          return "%s, $reg=%s$" % (losses_names[loss], reg)
+
+
+
+    def gen_table_start(setting, num_examples):
       ex_len = len(num_examples)
       table_start = """\\begin{table}[H]
+      \\footnotesize
       \\centering
-      \\begin{tabular}{l"""
+      \\begin{tabular}{ll"""
 
-      num_cols = len(seeds)*ex_len
-      table_start += "p{0.6cm}"*num_cols + "}\n"
+      if setting == "acc":
+        cols = 2
+      else:
+        cols = 1
+      num_cols = cols*ex_len
+      table_start += "l"*num_cols + "}\n"
 
-      table_start += """\\toprule
-      MIP Models & \\multicolumn{%s}{c}{Seed 1} & \\multicolumn{%s}{c}{Seed 2} & \\multicolumn{%s}{c}{Seed 3} \\\\
-      \\cmidrule(lr){2-%s}
-      \\cmidrule(lr){%s-%s}
-      \\cmidrule(lr){%s-%s}
-      """ % (ex_len, ex_len, ex_len, 2+ex_len-1,2+ex_len,2+2*ex_len-1,2+2*ex_len,2+3*ex_len-1)
+      if setting == "acc":
+        table_start += """\\toprule
+        {} & {} & \\multicolumn{%s}{c}{Training Accuracy [\\%%]} & \\multicolumn{%s}{c}{Testing Accuracy [\\%%]} \\\\
+        \\cmidrule(lr){3-%s}
+        \\cmidrule(lr){%s-%s}
+        """ % (ex_len, ex_len, 3+ex_len-1,3+ex_len,3+2*ex_len-1)
+      elif setting in ["train", "test", "time"]:
+        #table_start += """\\toprule
+        #{} & {} & \\multicolumn{%s}{c}{Runtime [s]} \\\\
+        #\\cmidrule(lr){3-%s}
+        #""" % (ex_len, 3+ex_len-1)
+        table_start += "\\toprule \n"
 
-      table_start += "{} &" + " & ".join([(" & ".join(str(x) for x in num_examples))]*len(seeds)) + "\\\\ \n \\midrule \n"
+      table_start += "{} & Samples &" + " & ".join([(" & ".join(str(x) for x in num_examples))]*cols) + "\\\\ \n \\midrule \n"
 
       return table_start
 
 
     for hl_key in self.results:
-      for setting in settings:        
-        table = gen_table_start(self.seeds, self.num_examples)
+      tr_table = gen_table_start("train", self.num_examples)
+      tst_table = gen_table_start("test", self.num_examples)
+      time_table = gen_table_start("time", self.num_examples)
+      for i,seed in enumerate(self.seeds):
+        start_multi = True
+        tr_table += "\\multirow{%s}{*}{Seed %s} & " % (len(self.losses),i+1)
+        tst_table += "\\multirow{%s}{*}{Seed %s} & " % (len(self.losses),i+1)
+        time_table += "\\multirow{%s}{*}{Seed %s} & " % (len(self.losses),i+1)
         for loss in self.losses:
-          table += loss
-          for i,seed in enumerate(self.seeds):
-            tmp_res = self.results[hl_key][loss][setting]
-            for ex in tmp_res:
-              table += " & %.2f" % tmp_res[ex][i]
-          table += "\\\\ \n"
-        table += "\\bottomrule \n \\end{tabular} \n \\caption{%s} \n \\label{Foo} \n \\end{table}"
-        with open("tablestuff.txt", "w") as f:
-          f.write(table)
-        set_trace()
+          if start_multi:
+            tr_table += get_losses_name(loss)
+            tst_table += get_losses_name(loss)
+            time_table += get_losses_name(loss)
+            start_multi = False
+          else:
+            tr_table += "{} & " + get_losses_name(loss)
+            tst_table += "{} & " + get_losses_name(loss)
+            time_table += "{} & " + get_losses_name(loss)
+          train_res = self.results[hl_key][loss]["train_accs"]
+          test_res = self.results[hl_key][loss]["test_accs"]
+          time_res = self.results[hl_key][loss]["runtimes"]
+          for ex in train_res:
+            tr_table += " & %.1f" % train_res[ex][i]
+          for ex in test_res:
+            tst_table += " & %.1f" % test_res[ex][i]
+          for ex in time_res:
+            time_table += " & %.1f" % time_res[ex][i]
+          #set_trace()
+          tr_table += "\\\\ \n"
+          tst_table += "\\\\ \n"
+          time_table += "\\\\ \n"
+        if i < len(self.seeds)-1:
+          tr_table += "\\midrule \n"
+          tst_table += "\\midrule \n"
+          time_table += "\\midrule \n"
+      tr_table += "\\bottomrule \n \\end{tabular} \n \\caption{Training accuracy [\\%%] on %s dataset - One hidden layer} \n \\label{Foo} \n \\end{table}" % (self.dataset)
+      tst_table += "\\bottomrule \n \\end{tabular} \n \\caption{Testing accuracy [\\%%] on %s dataset - One hidden layer} \n \\label{Foo} \n \\end{table}" % (self.dataset)
+      time_table += "\\bottomrule \n \\end{tabular} \n \\caption{Runtime [s] on %s dataset - One hidden layer} \n \\label{Foo} \n \\end{table}" % (self.dataset)
+      with open("tablestuff-%s.txt" % hl_key, "w") as f:
+        f.write(tr_table + "\n\n\n" + tst_table + "\n\n\n" + time_table)
+      set_trace()
+
+    
+    #""Models & \\multicolumn{%s}{c}{Seed 1} & \\multicolumn{%s}{c}{Seed 2} & \\multicolumn{%s}{c}{Seed 3} \\\\
+    # \\cmidrule(lr){2-%s}
+    # \\cmidrule(lr){%s-%s}
+    # \\cmidrule(lr){%s-%s}
+    # """ % (ex_len, ex_len, ex_len, 2+ex_len-1,2+ex_len,2+2*ex_len-1,2+2*ex_len,2+3*ex_len-1)
+    
 
 
 
