@@ -177,12 +177,8 @@ def get_weighted_mean_vars(network_vars, weights, deads=[]):
     if key == 'w_1' and len(deads)>0:
       # Handle dead inputs in batches
       for j,col in enumerate(weighted_avg[key][:,]):
-        from pdb import set_trace
-        #set_trace()
         if sum(weights*(1-deads[:,j])) != 0:
           weighted_avg[key][j] = np.round(col/sum(weights*(1-deads[:,j])))
-          if np.any(weighted_avg[key][j] > 3):
-            set_trace()
     else:
       weighted_avg[key] = np.round(weighted_avg[key]/sum(weights))
 
