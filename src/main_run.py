@@ -281,6 +281,9 @@ if __name__ == '__main__':
     print("test_p11: %.3f" % (p11))
     print("test_p10: %.3f" % (p10))
 
+    print("NN p11: %.3f" % (nn.female_pred1.getValue()))
+    print("NN p10: %.3f" % (nn.male_pred1.getValue()))
+
   set_trace()
 
   if args.save:

@@ -124,7 +124,7 @@ def get_mean_bound_matrix(network_vars, bound, diff=0, weights=[]):
 
   return bound_matrix
 
-def get_weighed_mean_bound_matrix(network_vars, bound, diff, weighted_avg):
+def get_weighted_mean_bound_matrix(network_vars, bound, diff, weighted_avg):
   bound_matrix = {}
   for key in network_vars[0]:
     if "w_" in key or "b_" in key:
@@ -160,7 +160,7 @@ def get_mean_vars(network_vars):
 
   return mean_vars
 
-def get_weighted_mean_vars(network_vars, weights):
+def get_weighted_mean_vars(network_vars, weights, deads=[]):
   weighted_avg = {}
   weights = np.array(weights)
   weights -= np.min(weights)
@@ -174,7 +174,17 @@ def get_weighted_mean_vars(network_vars, weights):
         weighted_avg[key] += weights[i]*var[key]
 
   for key in weighted_avg:
-    weighted_avg[key] = np.round(weighted_avg[key]/sum(weights))
+    if key == 'w_1' and len(deads)>0:
+      # Handle dead inputs in batches
+      for j,col in enumerate(weighted_avg[key][:,]):
+        from pdb import set_trace
+        #set_trace()
+        if sum(weights*(1-deads[:,j])) != 0:
+          weighted_avg[key][j] = np.round(col/sum(weights*(1-deads[:,j])))
+          if np.any(weighted_avg[key][j] > 3):
+            set_trace()
+    else:
+      weighted_avg[key] = np.round(weighted_avg[key]/sum(weights))
 
   return weighted_avg
 

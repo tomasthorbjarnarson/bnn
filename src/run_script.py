@@ -13,11 +13,13 @@ if __name__ == '__main__':
   parser.add_argument('--data', default="adult", type=str)
   parser.add_argument('--show', action='store_true')
   parser.add_argument('--short', action='store_true')
+  parser.add_argument('--table', action='store_true')
   args = parser.parse_args()
   script = args.script
   data = args.data
   show = args.show
   short = args.short
+  table = args.table
   print("short", short)
   print("show", show)
   losses = args.losses.split(",")
@@ -42,6 +44,7 @@ if __name__ == '__main__':
 
   if script == "precision":
     bounds = [1,3,7,15, 31]
+    bounds = [1,3,7,15]
     if short:
       bounds = [1,3,7]
   elif script =="push":
@@ -79,7 +82,9 @@ if __name__ == '__main__':
   elif script in ["precision", "losses", "push", "reg", "fair"]:
     SR = Script_Master(script, losses, data, num_examples, max_time, seeds, hls, bounds, regs, fair=fair, show=show)
     SR.run_all()
-    if script == "reg":
+    if table:
+      SR.make_tables()
+    elif script == "reg":
       SR.plot_reg_results()
     elif script == "fair":
       SR.visualize_fairness("EO")

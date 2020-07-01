@@ -6,7 +6,7 @@ from milp.min_hinge import MIN_HINGE
 from milp.sat_margin import SAT_MARGIN
 from milp.max_m import MAX_M
 from gd.gd_nn import GD_NN
-from helper.misc import infer_and_accuracy, clear_print, get_weighed_mean_bound_matrix, get_mean_vars
+from helper.misc import infer_and_accuracy, clear_print, get_weighted_mean_bound_matrix, get_mean_vars
 from helper.misc import strip_network,printProgressBar, extract_params, get_weighted_mean_vars
 from helper.data import load_data, get_training_batches, get_architecture
 import argparse
@@ -107,12 +107,13 @@ class Batch_Runner:
     nn.train(train_time*60, focus)
     runtime = nn.get_runtime()
     varMatrices = nn.extract_values()
+    dead = np.all(batch['train_x'] == 0, axis=0)
     printProgressBar(batch_num+1, self.num_batches)
 
     del nn.m
     del nn
 
-    return runtime, extract_params(varMatrices, get_keys=["w","b","H"])[0]
+    return runtime, extract_params(varMatrices, get_keys=["w","b","H"])[0], dead
 
   def run_batches_alt(self, batches, bound_matrix):
     batch_start = time.time()    
@@ -132,9 +133,11 @@ class Batch_Runner:
     batch_time = batch_end - batch_start
     print("Time to run batches: %.3f" % (batch_time))
     #runtimes = [x[0] for x in output]
-    network_vars = [x[1] for x in output]
+    all_results = [x for x in output]
+    deads = [x[2] for x in all_results]
+    network_vars = [x[1] for x in all_results]
 
-    return network_vars
+    return network_vars, np.array(deads)
 
 def get_std(network_vars):
   std_vars = {}
@@ -175,7 +178,7 @@ def run_parallel(seed, N, loss, data_name, batch_size, hls, bound, reg, fair, ep
 
     clear_print("EPOCH %s" % epoch)
     printProgressBar(0, N/batch_size)
-    network_vars = batch_runner.run_batches_alt(batches, bound_matrix)
+    network_vars, deads = batch_runner.run_batches_alt(batches, bound_matrix)
 
     std_vars, total_std = get_std(network_vars)
     print("Total std: %.2f" % total_std)
@@ -196,10 +199,9 @@ def run_parallel(seed, N, loss, data_name, batch_size, hls, bound, reg, fair, ep
     for var in network_vars:
       val_acc = infer_and_accuracy(data["val_x"], data["val_y"], var, architecture)
       val_accs.append(val_acc)
-    weighted_avg = get_weighted_mean_vars(network_vars, val_accs)
+    weighted_avg = get_weighted_mean_vars(network_vars, val_accs, deads)
 
-    
-    bound_matrix = get_weighed_mean_bound_matrix(network_vars, bound, bound - epoch, weighted_avg)
+    bound_matrix = get_weighted_mean_bound_matrix(network_vars, bound, bound - epoch, weighted_avg)
 
     mean_train_acc = infer_and_accuracy(data["train_x"], data["train_y"], weighted_avg, architecture)
     mean_val_acc = infer_and_accuracy(data["val_x"], data["val_y"], weighted_avg, architecture)
